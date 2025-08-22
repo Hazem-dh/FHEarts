@@ -1,0 +1,36 @@
+# Node modules
+node_modules/
+
+# Build output
+build/
+dist/
+artifacts/
+cache/
+fhevmTemp/
+types/
+
+# Hardhat files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Coverage reports
+coverage/
+
+# Misc
+*.log
+*.tgz
+
+# Truffle files
+*.db
+*.sqlite
