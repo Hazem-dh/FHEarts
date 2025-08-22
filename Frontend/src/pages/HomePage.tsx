@@ -3,11 +3,25 @@ import { useNavigate } from "react-router-dom";
 import { contract_address } from "../contract/addresses";
 import { ABI } from "../contract/ABI";
 import { usePublicClient, useAccount } from "wagmi";
+import { RegistrationFlow } from "../components/RegistrationFlow";
 
+interface RegistrationData {
+  leadingZeros: number; // euint8 - Count of leading zeros
+  countryCode: number; // euint8 - Country code as number
+  phoneDigits: number; // euint64 - Phone digits without leading zeros
+  age: number;
+  location: number; // City/region code
+  gender: number; // 0 for male, 1 for female, 2 for non-binary, 3 for other
+  interestedIn: number; // 0 for male, 1 for female, 2 for non-binary, 3 for other
+  preference1: number; // Movie type (0-4)
+  preference2: number; // Activity (0-4)
+  preference3: number; // Personality type (0-2)
+}
 export function HomePage() {
   const [isRegistered, setIsRegistered] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSearching, setIsSearching] = useState<boolean>(false);
+  const [showRegistration, setShowRegistration] = useState<boolean>(false);
   const navigate = useNavigate();
   const publicClient = usePublicClient();
   const { address } = useAccount();
@@ -33,7 +47,7 @@ export function HomePage() {
   };
 
   useEffect(() => {
-    const fetchStatus = async () => {
+    const fetchStatus = async (): Promise<void> => {
       setIsLoading(true);
       try {
         // Mock delay to simulate blockchain call for better UX
@@ -56,11 +70,35 @@ export function HomePage() {
     }
   }, [address, publicClient]);
 
-  const handleRegister = () => {
-    navigate("/profile");
+  const handleRegister = (): void => {
+    setShowRegistration(true);
   };
 
-  const handleSearchMatches = async () => {
+  const handleRegistrationComplete = async (
+    formData: RegistrationData
+  ): Promise<void> => {
+    try {
+      // TODO: Replace with actual smart contract call
+      // Example: await registerUserOnBlockchain(formData);
+      console.log("Registration completed with data:", formData);
+
+      // Simulate successful registration
+      setIsRegistered(true);
+      setShowRegistration(false);
+
+      // Show success message
+      alert("Registration successful! Welcome to LoveChain!");
+    } catch (error) {
+      console.error("Registration failed:", error);
+      alert("Registration failed. Please try again.");
+    }
+  };
+
+  const handleRegistrationBack = (): void => {
+    setShowRegistration(false);
+  };
+
+  const handleSearchMatches = async (): Promise<void> => {
     setIsSearching(true);
     try {
       // TODO: Replace with actual smart contract transaction
@@ -78,6 +116,20 @@ export function HomePage() {
       setIsSearching(false);
     }
   };
+
+  // Show registration flow if user clicked register
+  if (showRegistration) {
+    return (
+      <RegistrationFlow
+        onComplete={
+          handleRegistrationComplete as (
+            data: RegistrationData
+          ) => void | Promise<void>
+        }
+        onBack={handleRegistrationBack}
+      />
+    );
+  }
 
   if (isLoading) {
     return (
