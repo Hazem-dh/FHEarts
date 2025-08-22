@@ -1,29 +1,44 @@
-import { WalletButton } from "./components/walletButton";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { DatingPrompt } from "./components/DatingPrompt";
-import { AppInterface } from "./components/AppInterface";
+import { ConnectedLayout } from "./components/ConnectedLayout";
+import { UnconnectedLayout } from "./components/UnconnectedLayout";
+import { HomePage } from "./pages/HomePage";
+import { ProfilePage } from "./pages/ProfilePage";
+import { MatchesPage } from "./pages/MatchesPage";
 import { useAccount, useChainId } from "wagmi";
 
-function App() {
+function AppContent() {
   const { isConnected } = useAccount();
   const chainId = useChainId();
 
-  return (
-    <div className="min-h-screen max-h-screen overflow-hidden">
-      {/* Logo in top left */}
-      <WalletButton />
+  const isAuthenticated: boolean = isConnected && chainId === 11155111;
 
-      <div className="fixed inset-0 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500">
-        <main className="h-screen flex items-center justify-center p-4 overflow-y-auto">
-          <div className="w-full flex justify-center items-center min-h-full py-8">
-            {isConnected && chainId === 11155111 ? (
-              <AppInterface />
-            ) : (
-              <DatingPrompt />
-            )}{" "}
-          </div>
-        </main>
-      </div>
-    </div>
+  if (!isAuthenticated) {
+    return (
+      <UnconnectedLayout>
+        <DatingPrompt />
+      </UnconnectedLayout>
+    );
+  }
+
+  return (
+    <ConnectedLayout>
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/matches" element={<MatchesPage />} />
+        {/* Redirect any unknown routes to home */}
+        <Route path="*" element={<HomePage />} />
+      </Routes>
+    </ConnectedLayout>
+  );
+}
+
+function App() {
+  return (
+    <Router>
+      <AppContent />
+    </Router>
   );
 }
 

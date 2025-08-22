@@ -1,0 +1,19 @@
+import React from "react";
+import { WalletButton } from "./walletButton";
+
+export function UnconnectedLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="min-h-screen max-h-screen overflow-hidden">
+      <div className="absolute top-4 left-4 z-10">
+        <WalletButton />
+      </div>
+      <div className="fixed inset-0 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500">
+        <main className="h-screen flex items-center justify-center p-4 overflow-y-auto">
+          <div className="w-full flex justify-center items-center min-h-full py-8">
+            {children}
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}
