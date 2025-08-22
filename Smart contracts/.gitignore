@@ -8,6 +8,7 @@ artifacts/
 cache/
 fhevmTemp/
 types/
+deployments/
 
 # Hardhat files
 .env
