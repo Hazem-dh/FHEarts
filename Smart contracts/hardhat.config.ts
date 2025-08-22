@@ -10,17 +10,22 @@ import "solidity-coverage";
 import * as dotenv from "dotenv";
 
 import "./tasks/accounts";
-import "./tasks/FHECounter";
+import "./tasks/Fhearts";
 
 dotenv.config();
 
 // Run 'npx hardhat vars setup' to see the list of variables that need to be set
 
-const MNEMONIC = process.env.MNEMONIC || "test test test test test test test test test test test junk";
-const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY || "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz";
+const MNEMONIC =
+  process.env.MNEMONIC ||
+  "test test test test test test test test test test test junk";
+const ALCHEMY_API_KEY =
+  process.env.ALCHEMY_API_KEY || "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz";
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || "";
 const PRIVATE_KEY = process.env.PRIVATE_KEY || "";
-const sepoliaAccounts = PRIVATE_KEY ? [PRIVATE_KEY] : { mnemonic: MNEMONIC, path: "m/44'/60'/0'/0/", count: 10 };
+const sepoliaAccounts = PRIVATE_KEY
+  ? [PRIVATE_KEY]
+  : { mnemonic: MNEMONIC, path: "m/44'/60'/0'/0/", count: 10 };
 
 const config: HardhatUserConfig = {
   defaultNetwork: "hardhat",
