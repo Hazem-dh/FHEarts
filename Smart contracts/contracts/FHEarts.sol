@@ -12,9 +12,13 @@ contract FHEarts is SepoliaConfig,Ownable {
 
     struct UserProfile {
         address userAddress;
+        euint8 countryCode; // Country code for phone number
+        euint8 leadingZero; // Leading zero indicator for phone number
         euint64 encryptedPhoneNumber; // Encrypted off-chain, revealed only on mutual match
         euint8 age; // Age in years
         euint8 location; // City/region code
+        euint8 gender ; // 0 for  male, 1 for female, 2 for non-binary 3 for other
+        euint8 intersetedIn; // 0 for  male, 1 for  female, 2 for non-binary 3 for other 
         euint8 preference1; // First preference (0-9)
         euint8 preference2; // Second preference (0-9)
         euint8 preference3; // Third preference (0-9)
@@ -64,9 +68,13 @@ contract FHEarts is SepoliaConfig,Ownable {
         */
         
     function registerUser(
+        externalEuint8 countryCode,
+        externalEuint8 leadingZero,
         externalEuint64 encryptedPhoneNumber,
         externalEuint8 age  ,
         externalEuint8 location ,
+        externalEuint8 gender ,
+        externalEuint8 intersetedIn ,
         externalEuint8 preference1 ,
         externalEuint8 preference2 ,
         externalEuint8 preference3 ,
@@ -75,9 +83,13 @@ contract FHEarts is SepoliaConfig,Ownable {
         require(!isRegistered[msg.sender], "User already registered");
 
         // Convert external inputs to FHE types using the correct method
+        euint8 countryCode_ = FHE.fromExternal(countryCode, inputProof);
+        euint8 leadingZero_ = FHE.fromExternal(leadingZero, inputProof);
         euint64 encryptedPhoneNumber_ = FHE.fromExternal(encryptedPhoneNumber, inputProof);
         euint8 age_ = FHE.fromExternal(age,inputProof );
         euint8 location_ = FHE.fromExternal(location,inputProof );
+        euint8 gender_ = FHE.fromExternal(gender,inputProof );
+        euint8 intersetedIn_ = FHE.fromExternal(intersetedIn,inputProof );
         euint8 preference1_ = FHE.fromExternal(preference1,inputProof );
         euint8 preference2_ = FHE.fromExternal(preference2,inputProof );
         euint8 preference3_ = FHE.fromExternal(preference3,inputProof );
@@ -85,9 +97,13 @@ contract FHEarts is SepoliaConfig,Ownable {
         // Create user profile
         profiles[msg.sender] = UserProfile({
             userAddress: msg.sender,
+            countryCode: countryCode_,
+            leadingZero: leadingZero_,
             encryptedPhoneNumber: encryptedPhoneNumber_,
             age: age_,
             location: location_,
+            gender : gender_,
+            intersetedIn: intersetedIn_,
             preference1: preference1_,
             preference2: preference2_,
             preference3: preference3_,

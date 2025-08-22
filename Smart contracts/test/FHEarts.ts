@@ -47,10 +47,13 @@ describe("FHECounter", function () {
       fheFHEartsContractAddress,
       signers.alice.address
     );
-
+    input.add8(1); // country code
+    input.add8(0); // leading zero
     input.add64(2235497654); // phone number
     input.add8(25); // age
     input.add8(1); // location
+    input.add8(0); // gender
+    input.add8(1); // interestedIn
     input.add8(2); // preference1
     input.add8(3); // preference2
     input.add8(4); // preference3
@@ -60,12 +63,16 @@ describe("FHECounter", function () {
     // Call registerUser with encrypted handles and proof
     await expect(
       FHEartsContract.connect(signers.alice).registerUser(
-        encryptedInput.handles[0], // phone number
-        encryptedInput.handles[1], // age
-        encryptedInput.handles[2], // location
-        encryptedInput.handles[3], // preference1
-        encryptedInput.handles[4], // preference2
-        encryptedInput.handles[5], // preference3
+        encryptedInput.handles[0], // country code
+        encryptedInput.handles[1], // leading zero
+        encryptedInput.handles[2], // phone number
+        encryptedInput.handles[3], // age
+        encryptedInput.handles[4], // location
+        encryptedInput.handles[5], // gender
+        encryptedInput.handles[6], // interestedIn
+        encryptedInput.handles[7], // preference1
+        encryptedInput.handles[8], // preference2
+        encryptedInput.handles[9], // preference3
         encryptedInput.inputProof
       )
     )
