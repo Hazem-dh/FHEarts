@@ -6,6 +6,7 @@ import { HomePage } from "./pages/HomePage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { MatchesPage } from "./pages/MatchesPage";
 import { useAccount, useChainId } from "wagmi";
+import { FHEProvider } from "./contexts/FHEProvider";
 
 function AppContent() {
   const { isConnected } = useAccount();
@@ -36,9 +37,11 @@ function AppContent() {
 
 function App() {
   return (
-    <Router>
-      <AppContent />
-    </Router>
+    <FHEProvider>
+      <Router>
+        <AppContent />
+      </Router>
+    </FHEProvider>
   );
 }
 
