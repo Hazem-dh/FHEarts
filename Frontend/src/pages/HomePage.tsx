@@ -5,6 +5,7 @@ import { ABI } from "../contract/ABI";
 import { usePublicClient, useAccount } from "wagmi";
 import { RegistrationFlow } from "../components/RegistrationFlow";
 import { useInstance } from "../hooks/useInstance";
+import { ethers } from "ethers";
 
 interface RegistrationData {
   leadingZeros: number; // euint8 - Count of leading zeros
@@ -121,23 +122,42 @@ export function HomePage() {
       // This action will return the list of ciphertext handles.
       console.log("Encrypting data...");
       const ciphertexts = await buffer.encrypt();
+      console.log(ciphertexts);
 
-      console.log("Encrypted ciphertexts:", ciphertexts);
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const contract = new ethers.Contract(
+        //@ts-ignore
+        contract_address, // replace with correct chain or dynamic switch
+        ABI,
+        signer
+      );
 
-      // TODO: Make the actual smart contract call with encrypted ciphertexts
-      // Example: await writeContract({
-      //   address: contract_address,
-      //   abi: ABI,
-      //   functionName: "registerUser",
-      //   args: [ciphertexts], // Pass the encrypted ciphertexts array
-      // });
+      
+
+// Call registerUser
+const tx = await contract.registerUser(
+  ciphertexts.handles[0], // countryCode
+  ciphertexts.handles[1], // leadingZero
+  ciphertexts.handles[2], // encryptedPhoneNumber
+  ciphertexts.handles[3], // age
+  ciphertexts.handles[4], // location
+  ciphertexts.handles[5], // gender
+  ciphertexts.handles[6], // interestedIn
+  ciphertexts.handles[7], // preference1
+  ciphertexts.handles[8], // preference2
+  ciphertexts.handles[9], // preference3
+  ciphertexts.inputProof   // proof (always the last argument)
+);
+
+console.log("Tx sent:", tx.hash);
+const receipt = await tx.wait();
+console.log("Tx confirmed:", receipt.blockNumber);
 
       // Simulate successful registration
       setIsRegistered(true);
       setShowRegistration(false);
 
-      // Show success message
-      alert("Registration successful! Welcome to LoveChain!");
     } catch (error) {
       console.error("Registration failed:", error);
       alert(
