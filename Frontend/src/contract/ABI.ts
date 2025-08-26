@@ -1,5 +1,5 @@
 // Auto-generated contract ABI
-// This file is automatically updated by the deployment script
+// This file is automatically updated from the deployment folder
 
 export const ABI = 
 [
@@ -50,26 +50,13 @@ export const ABI =
     "type": "event"
   },
   {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "user",
-        "type": "address"
-      }
-    ],
-    "name": "UserRegistered",
-    "type": "event"
-  },
-  {
     "inputs": [],
     "name": "BATCH_SIZE",
     "outputs": [
       {
-        "internalType": "uint256",
+        "internalType": "uint8",
         "name": "",
-        "type": "uint256"
+        "type": "uint8"
       }
     ],
     "stateMutability": "view",
@@ -96,12 +83,12 @@ export const ABI =
   },
   {
     "inputs": [],
-    "name": "MATCH_THRESHOLD",
+    "name": "MAX_MATCHES",
     "outputs": [
       {
-        "internalType": "uint256",
+        "internalType": "uint8",
         "name": "",
-        "type": "uint256"
+        "type": "uint8"
       }
     ],
     "stateMutability": "view",
@@ -112,9 +99,127 @@ export const ABI =
     "name": "MAX_PREFERENCE_VALUE",
     "outputs": [
       {
-        "internalType": "uint256",
+        "internalType": "uint8",
         "name": "",
-        "type": "uint256"
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "activeUsersCount",
+    "outputs": [
+      {
+        "internalType": "uint64",
+        "name": "",
+        "type": "uint64"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint64",
+        "name": "matchedUserIndex",
+        "type": "uint64"
+      }
+    ],
+    "name": "confirmMatch",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "deactivateProfile",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "user",
+        "type": "address"
+      }
+    ],
+    "name": "getMatchStatus",
+    "outputs": [
+      {
+        "internalType": "uint8",
+        "name": "matchCount",
+        "type": "uint8"
+      },
+      {
+        "internalType": "uint8",
+        "name": "currentBatch",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bool",
+        "name": "searchComplete",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "matchedUser",
+        "type": "address"
+      }
+    ],
+    "name": "givePhoneConsent",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "user1",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "user2",
+        "type": "address"
+      }
+    ],
+    "name": "hasMutualPhoneConsent",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "user",
+        "type": "address"
+      }
+    ],
+    "name": "hasPendingMatches",
+    "outputs": [
+      {
+        "internalType": "address[]",
+        "name": "",
+        "type": "address[]"
       }
     ],
     "stateMutability": "view",
@@ -140,6 +245,69 @@ export const ABI =
     "type": "function"
   },
   {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "matchStates",
+    "outputs": [
+      {
+        "internalType": "uint8",
+        "name": "currentBatch",
+        "type": "uint8"
+      },
+      {
+        "internalType": "uint8",
+        "name": "matchCount",
+        "type": "uint8"
+      },
+      {
+        "internalType": "euint8",
+        "name": "maxScore",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "euint64",
+        "name": "maxScoreIndex",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bool",
+        "name": "searchComplete",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "mutualMatches",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [],
     "name": "owner",
     "outputs": [
@@ -147,6 +315,30 @@ export const ABI =
         "internalType": "address",
         "name": "",
         "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "phoneConsent",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
       }
     ],
     "stateMutability": "view",
@@ -199,7 +391,7 @@ export const ABI =
       },
       {
         "internalType": "euint8",
-        "name": "intersetedIn",
+        "name": "interestedIn",
         "type": "bytes32"
       },
       {
@@ -224,6 +416,13 @@ export const ABI =
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "reactivateProfile",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -260,7 +459,7 @@ export const ABI =
       },
       {
         "internalType": "externalEuint8",
-        "name": "intersetedIn",
+        "name": "interestedIn",
         "type": "bytes32"
       },
       {
@@ -297,6 +496,38 @@ export const ABI =
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "resetMatchSearch",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "requester",
+        "type": "address"
+      },
+      {
+        "internalType": "bool",
+        "name": "accept",
+        "type": "bool"
+      }
+    ],
+    "name": "respondToMatch",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "searchMatches",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "address",
@@ -312,6 +543,69 @@ export const ABI =
   {
     "inputs": [
       {
+        "internalType": "externalEuint8",
+        "name": "countryCode",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "externalEuint8",
+        "name": "leadingZero",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "externalEuint64",
+        "name": "encryptedPhoneNumber",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "externalEuint8",
+        "name": "age",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "externalEuint8",
+        "name": "location",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "externalEuint8",
+        "name": "gender",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "externalEuint8",
+        "name": "interestedIn",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "externalEuint8",
+        "name": "preference1",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "externalEuint8",
+        "name": "preference2",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "externalEuint8",
+        "name": "preference3",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes",
+        "name": "inputProof",
+        "type": "bytes"
+      }
+    ],
+    "name": "updateProfile",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "address",
         "name": "",
         "type": "address"
@@ -320,9 +614,43 @@ export const ABI =
     "name": "userActiveIndex",
     "outputs": [
       {
+        "internalType": "uint64",
+        "name": "",
+        "type": "uint64"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      },
+      {
         "internalType": "uint256",
         "name": "",
         "type": "uint256"
+      }
+    ],
+    "name": "userMatches",
+    "outputs": [
+      {
+        "internalType": "euint8",
+        "name": "score",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "euint64",
+        "name": "matchIndex",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bool",
+        "name": "isValid",
+        "type": "bool"
       }
     ],
     "stateMutability": "view",

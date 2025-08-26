@@ -1,5 +1,3 @@
-// Auto-generated contract addresses
-// This file is automatically updated by the deployment script
 
-export const contract_address = "0x2928aAD172f43eeD5bf85c36Ec4c396264eee79C" ;
+export const contract_address = "0x2b33d03DD65408389b3c883eD15D94B211Bf9fC5" ;
 
