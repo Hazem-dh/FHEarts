@@ -170,6 +170,74 @@ export const ABI =
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "getMyProfile",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "userAddress",
+        "type": "address"
+      },
+      {
+        "internalType": "euint8",
+        "name": "countryCode",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "euint8",
+        "name": "leadingZero",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "euint64",
+        "name": "encryptedPhoneNumber",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "euint8",
+        "name": "age",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "euint8",
+        "name": "location",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "euint8",
+        "name": "gender",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "euint8",
+        "name": "interestedIn",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "euint8",
+        "name": "preference1",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "euint8",
+        "name": "preference2",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "euint8",
+        "name": "preference3",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bool",
+        "name": "isActive",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "address",
@@ -234,6 +302,25 @@ export const ABI =
       }
     ],
     "name": "isRegistered",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "user",
+        "type": "address"
+      }
+    ],
+    "name": "isUserRegistered",
     "outputs": [
       {
         "internalType": "bool",

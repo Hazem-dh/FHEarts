@@ -105,6 +105,16 @@ contract FHEarts is SepoliaConfig, Ownable {
         FHE.allowThis(preference1_);
         FHE.allowThis(preference2_);
         FHE.allowThis(preference3_);
+        FHE.allowThis(countryCode_);
+        FHE.allow(leadingZero_,msg.sender);
+        FHE.allow(encryptedPhoneNumber_,msg.sender);
+        FHE.allow(age_,msg.sender);
+        FHE.allow(location_,msg.sender);
+        FHE.allow(gender_,msg.sender);
+        FHE.allow(interestedIn_,msg.sender);
+        FHE.allow(preference1_,msg.sender);
+        FHE.allow(preference2_,msg.sender);
+        FHE.allow(preference3_,msg.sender);
 
         // Create user profile
         profiles[msg.sender] = UserProfile({
@@ -427,6 +437,61 @@ contract FHEarts is SepoliaConfig, Ownable {
         return result;
     }
     
+    /**
+ * @notice Get user's own encrypted profile data for frontend decryption
+ * @return userAddress The address of the user
+ * @return countryCode Encrypted country code
+ * @return leadingZero Encrypted leading zero indicator
+ * @return encryptedPhoneNumber Encrypted phone number
+ * @return age Encrypted age
+ * @return location Encrypted location
+ * @return gender Encrypted gender
+ * @return interestedIn Encrypted interest preference
+ * @return preference1 Encrypted preference 1
+ * @return preference2 Encrypted preference 2
+ * @return preference3 Encrypted preference 3
+ * @return isActive Whether the profile is active
+ */
+function getMyProfile() external view onlyRegistered returns (
+    address userAddress,
+    euint8 countryCode,
+    euint8 leadingZero,
+    euint64 encryptedPhoneNumber,
+    euint8 age,
+    euint8 location,
+    euint8 gender,
+    euint8 interestedIn,
+    euint8 preference1,
+    euint8 preference2,
+    euint8 preference3,
+    bool isActive
+) {
+    UserProfile storage profile = profiles[msg.sender];
+    
+    return (
+        profile.userAddress,
+        profile.countryCode,
+        profile.leadingZero,
+        profile.encryptedPhoneNumber,
+        profile.age,
+        profile.location,
+        profile.gender,
+        profile.interestedIn,
+        profile.preference1,
+        profile.preference2,
+        profile.preference3,
+        profile.isActive
+    );
+}
+
+/**
+ * @notice Check if a specific user is registered
+ * @param user The address to check
+ * @return registered Whether the user is registered
+ */
+function isUserRegistered(address user) external view returns (bool) {
+    return isRegistered[user];
+}
     /**
      * @notice Get user's match count and search status
      */
