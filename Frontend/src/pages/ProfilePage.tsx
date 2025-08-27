@@ -4,9 +4,9 @@ import { useAccount, usePublicClient } from "wagmi";
 import { contract_address } from "../contract/addresses";
 import { ABI } from "../contract/ABI";
 import { useInstance } from "../hooks/useInstance";
-import { toast, ToastContainer } from 'react-toastify';
+import { toast, ToastContainer } from "react-toastify";
 import { ethers } from "ethers";
-import 'react-toastify/dist/ReactToastify.css';
+import "react-toastify/dist/ReactToastify.css";
 
 interface ProfileData {
   phoneNumber: string;
@@ -25,18 +25,18 @@ interface ProfileData {
 
 // Type for the contract return value
 type ProfileContractResult = readonly [
-  string,  // userAddress
-  bigint,  // countryCode (euint8)
-  bigint,  // leadingZero (euint8)
-  bigint,  // encryptedPhoneNumber (euint64)
-  bigint,  // age (euint8)
-  bigint,  // location (euint8)
-  bigint,  // gender (euint8)
-  bigint,  // interestedIn (euint8)
-  bigint,  // preference1 (euint8)
-  bigint,  // preference2 (euint8)
-  bigint,  // preference3 (euint8)
-  boolean  // isActive
+  string, // userAddress
+  bigint, // countryCode (euint8)
+  bigint, // leadingZero (euint8)
+  bigint, // encryptedPhoneNumber (euint64)
+  bigint, // age (euint8)
+  bigint, // location (euint8)
+  bigint, // gender (euint8)
+  bigint, // interestedIn (euint8)
+  bigint, // preference1 (euint8)
+  bigint, // preference2 (euint8)
+  bigint, // preference3 (euint8)
+  boolean // isActive
 ];
 
 // Mapping data
@@ -54,16 +54,16 @@ const LOCATION_OPTIONS = [
 ];
 
 const LOCATION_TO_COUNTRY_CODE: { [key: number]: number } = {
-  0: 33,   // France
-  1: 49,   // Germany
-  2: 34,   // Spain
-  3: 39,   // Italy
-  4: 31,   // Netherlands
-  5: 32,   // Belgium
-  6: 41,   // Switzerland
-  7: 43,   // Austria
-  8: 351,  // Portugal
-  9: 46,   // Sweden
+  0: 33, // France
+  1: 49, // Germany
+  2: 34, // Spain
+  3: 39, // Italy
+  4: 31, // Netherlands
+  5: 32, // Belgium
+  6: 41, // Switzerland
+  7: 43, // Austria
+  8: 351, // Portugal
+  9: 46, // Sweden
 };
 
 const GENDER_OPTIONS = [
@@ -112,7 +112,7 @@ export function ProfilePage() {
   const [hasDecrypted, setHasDecrypted] = useState<boolean>(false);
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [phoneInput, setPhoneInput] = useState<string>("");
-  
+
   const navigate = useNavigate();
   const { address } = useAccount();
   const publicClient = usePublicClient();
@@ -133,7 +133,7 @@ export function ProfilePage() {
           functionName: "isRegistered",
           args: [address],
         });
-        
+
         setIsRegistered(Boolean(result));
       } catch (error) {
         console.error("Error checking registration:", error);
@@ -160,6 +160,107 @@ export function ProfilePage() {
     };
   };
 
+  const decryptProfilePromise = async () => {
+    if (!instance || !publicClient || !address) {
+      throw new Error("Please wait for encryption system to load");
+    }
+
+    // Get signer
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const signer = await provider.getSigner();
+
+    // Call getMyProfile to get encrypted data
+    const result = (await publicClient.readContract({
+      address: contract_address,
+      abi: ABI,
+      functionName: "getProfile",
+      args: [address],
+    })) as ProfileContractResult;
+
+    // Generate keypair for decryption
+    const keypair = instance.generateKeypair();
+
+    // Prepare handle-contract pairs
+    const handleContractPairs = [
+      { handle: result[0].toString(), contractAddress: contract_address }, // countryCode
+      { handle: result[1].toString(), contractAddress: contract_address }, // leadingZero
+      { handle: result[2].toString(), contractAddress: contract_address }, // phoneNumber
+      { handle: result[3].toString(), contractAddress: contract_address }, // age
+      { handle: result[4].toString(), contractAddress: contract_address }, // location
+      { handle: result[5].toString(), contractAddress: contract_address }, // gender
+      { handle: result[6].toString(), contractAddress: contract_address }, // interestedIn
+      { handle: result[7].toString(), contractAddress: contract_address }, // preference1
+      { handle: result[8].toString(), contractAddress: contract_address }, // preference2
+      { handle: result[9].toString(), contractAddress: contract_address }, // preference3
+    ];
+
+    // Create EIP712 signature
+    const startTimeStamp = Math.floor(Date.now() / 1000).toString();
+    const durationDays = "10";
+    const contractAddresses = [contract_address];
+
+    const eip712 = instance.createEIP712(
+      keypair.publicKey,
+      contractAddresses,
+      startTimeStamp,
+      durationDays
+    );
+
+    const signature = await signer.signTypedData(
+      eip712.domain,
+      {
+        UserDecryptRequestVerification:
+          eip712.types.UserDecryptRequestVerification,
+      },
+      eip712.message
+    );
+
+    // Decrypt all values
+    const decryptResult = await instance.userDecrypt(
+      handleContractPairs,
+      keypair.privateKey,
+      keypair.publicKey,
+      signature.replace("0x", ""),
+      contractAddresses,
+      address,
+      startTimeStamp,
+      durationDays
+    );
+    console.log("Decrypt result:", decryptResult);
+    // Extract decrypted values
+    const countryCode = Number(decryptResult[result[0].toString()]);
+    const leadingZeros = Number(decryptResult[result[1].toString()]);
+    const phoneDigits = Number(decryptResult[result[2].toString()]);
+    const age = Number(decryptResult[result[3].toString()]);
+    const location = Number(decryptResult[result[4].toString()]);
+    const gender = Number(decryptResult[result[5].toString()]);
+    const interestedIn = Number(decryptResult[result[6].toString()]);
+    const preference1 = Number(decryptResult[result[7].toString()]);
+    const preference2 = Number(decryptResult[result[8].toString()]);
+    const preference3 = Number(decryptResult[result[9].toString()]);
+    // Reconstruct phone number
+    const zerosString = "0".repeat(leadingZeros);
+    const fullPhoneNumber = `${zerosString}${phoneDigits}`;
+
+    // Create profile object
+    const decryptedProfile: ProfileData = {
+      phoneNumber: fullPhoneNumber,
+      countryCode,
+      leadingZeros,
+      phoneDigits,
+      age,
+      location,
+      gender,
+      interestedIn,
+      preference1,
+      preference2,
+      preference3,
+      isActive: Boolean(result[11]),
+    };
+
+    return decryptedProfile;
+  };
+
   const handleDecryptProfile = async () => {
     if (!instance || !publicClient || !address) {
       toast.error("Please wait for encryption system to load");
@@ -167,117 +268,20 @@ export function ProfilePage() {
     }
 
     setIsDecrypting(true);
-    toast.info("🔓 Fetching encrypted profile data...");
 
     try {
-      // Get signer
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const signer = await provider.getSigner();
-
-      // Call getMyProfile to get encrypted data
-      const result = await publicClient.readContract({
-        address: contract_address,
-        abi: ABI,
-        functionName: "getMyProfile",
-        args: [],
-      }) as ProfileContractResult;
-
-      toast.info("🔐 Generating decryption keys...");
-
-      // Generate keypair for decryption
-      const keypair = instance.generateKeypair();
-
-      // Prepare handle-contract pairs
-      const handleContractPairs = [
-        { handle: result[1].toString(), contractAddress: contract_address }, // countryCode
-        { handle: result[2].toString(), contractAddress: contract_address }, // leadingZero
-        { handle: result[3].toString(), contractAddress: contract_address }, // phoneNumber
-        { handle: result[4].toString(), contractAddress: contract_address }, // age
-        { handle: result[5].toString(), contractAddress: contract_address }, // location
-        { handle: result[6].toString(), contractAddress: contract_address }, // gender
-        { handle: result[7].toString(), contractAddress: contract_address }, // interestedIn
-        { handle: result[8].toString(), contractAddress: contract_address }, // preference1
-        { handle: result[9].toString(), contractAddress: contract_address }, // preference2
-        { handle: result[10].toString(), contractAddress: contract_address }, // preference3
-      ];
-
-      // Create EIP712 signature
-      const startTimeStamp = Math.floor(Date.now() / 1000).toString();
-      const durationDays = "10";
-      const contractAddresses = [contract_address];
-      
-      const eip712 = instance.createEIP712(
-        keypair.publicKey, 
-        contractAddresses, 
-        startTimeStamp, 
-        durationDays
-      );
-
-      toast.info("👛 Please sign the decryption request...");
-
-      const signature = await signer.signTypedData(
-        eip712.domain,
-        {
-          UserDecryptRequestVerification: eip712.types.UserDecryptRequestVerification,
-        },
-        eip712.message,
-      );
-
-      toast.info("🔓 Decrypting your data...");
-
-      // Decrypt all values
-      const decryptResult = await instance.userDecrypt(
-        handleContractPairs,
-        keypair.privateKey,
-        keypair.publicKey,
-        signature.replace("0x", ""),
-        contractAddresses,
-        address,
-        startTimeStamp,
-        durationDays,
-      );
-
-      // Extract decrypted values
-      const countryCode = Number(decryptResult[result[1].toString()]);
-      const leadingZeros = Number(decryptResult[result[2].toString()]);
-      const phoneDigits = Number(decryptResult[result[3].toString()]);
-      const age = Number(decryptResult[result[4].toString()]);
-      const location = Number(decryptResult[result[5].toString()]);
-      const gender = Number(decryptResult[result[6].toString()]);
-      const interestedIn = Number(decryptResult[result[7].toString()]);
-      const preference1 = Number(decryptResult[result[8].toString()]);
-      const preference2 = Number(decryptResult[result[9].toString()]);
-      const preference3 = Number(decryptResult[result[10].toString()]);
-
-      // Reconstruct phone number
-      const zerosString = '0'.repeat(leadingZeros);
-      const fullPhoneNumber = `${zerosString}${phoneDigits}`;
-
-      // Create profile object
-      const decryptedProfile: ProfileData = {
-        phoneNumber: fullPhoneNumber,
-        countryCode,
-        leadingZeros,
-        phoneDigits,
-        age,
-        location,
-        gender,
-        interestedIn,
-        preference1,
-        preference2,
-        preference3,
-        isActive: Boolean(result[11])
-      };
-
+      const decryptedProfile = await toast.promise(decryptProfilePromise(), {
+        pending: "🔐 Decrypting your profile...",
+        success: "✅ Profile decrypted successfully!",
+        error: "❌ Failed to decrypt profile. Please try again.",
+      });
+      console.log("Decrypted Profile:", decryptedProfile);
       setProfile(decryptedProfile);
       setEditedProfile(decryptedProfile);
-      setPhoneInput(fullPhoneNumber);
+      setPhoneInput(decryptedProfile.phoneNumber);
       setHasDecrypted(true);
-      toast.success("✅ Profile decrypted successfully!");
-
     } catch (error) {
       console.error("Error decrypting profile:", error);
-      toast.error("Failed to decrypt profile. Please try again.");
     } finally {
       setIsDecrypting(false);
     }
@@ -295,6 +299,70 @@ export function ProfilePage() {
     setIsEditing(false);
   };
 
+  const updateProfilePromise = async () => {
+    if (!instance || !address || !editedProfile) {
+      throw new Error("Missing required data");
+    }
+
+    // Parse phone number
+    const phoneData = parsePhoneNumber(
+      LOCATION_TO_COUNTRY_CODE[editedProfile.location] || 33,
+      phoneInput
+    );
+
+    if (!phoneData) {
+      throw new Error("Invalid phone number");
+    }
+
+    // Create encrypted input buffer
+    const buffer = instance.createEncryptedInput(contract_address, address);
+
+    // Add values to buffer
+    buffer.add8(BigInt(phoneData.countryCode));
+    buffer.add8(BigInt(phoneData.leadingZeros));
+    buffer.add64(BigInt(phoneData.phoneDigits));
+    buffer.add8(BigInt(editedProfile.age));
+    buffer.add8(BigInt(editedProfile.location));
+    buffer.add8(BigInt(editedProfile.gender));
+    buffer.add8(BigInt(editedProfile.interestedIn));
+    buffer.add8(BigInt(editedProfile.preference1));
+    buffer.add8(BigInt(editedProfile.preference2));
+    buffer.add8(BigInt(editedProfile.preference3));
+
+    const ciphertexts = await buffer.encrypt();
+
+    // Get signer and contract
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const signer = await provider.getSigner();
+    const contract = new ethers.Contract(contract_address, ABI, signer);
+
+    // Call updateProfile
+    const tx = await contract.updateProfile(
+      ciphertexts.handles[0], // countryCode
+      ciphertexts.handles[1], // leadingZero
+      ciphertexts.handles[2], // phoneDigits
+      ciphertexts.handles[3], // age
+      ciphertexts.handles[4], // location
+      ciphertexts.handles[5], // gender
+      ciphertexts.handles[6], // interestedIn
+      ciphertexts.handles[7], // preference1
+      ciphertexts.handles[8], // preference2
+      ciphertexts.handles[9], // preference3
+      ciphertexts.inputProof
+    );
+
+    await tx.wait();
+
+    // Return updated profile data
+    return {
+      ...editedProfile,
+      phoneNumber: phoneInput,
+      countryCode: phoneData.countryCode,
+      leadingZeros: phoneData.leadingZeros,
+      phoneDigits: phoneData.phoneDigits,
+    };
+  };
+
   const handleUpdateProfile = async () => {
     if (!instance || !address || !editedProfile) {
       toast.error("Missing required data");
@@ -302,81 +370,19 @@ export function ProfilePage() {
     }
 
     setIsUpdating(true);
-    toast.info("📦 Preparing encrypted update...");
 
     try {
-      // Parse phone number
-      const phoneData = parsePhoneNumber(
-        LOCATION_TO_COUNTRY_CODE[editedProfile.location] || 33,
-        phoneInput
-      );
-
-      if (!phoneData) {
-        toast.error("Invalid phone number");
-        setIsUpdating(false);
-        return;
-      }
-
-      // Create encrypted input buffer
-      const buffer = instance.createEncryptedInput(contract_address, address);
-
-      // Add values to buffer
-      buffer.add8(BigInt(phoneData.countryCode));
-      buffer.add8(BigInt(phoneData.leadingZeros));
-      buffer.add64(BigInt(phoneData.phoneDigits));
-      buffer.add8(BigInt(editedProfile.age));
-      buffer.add8(BigInt(editedProfile.location));
-      buffer.add8(BigInt(editedProfile.gender));
-      buffer.add8(BigInt(editedProfile.interestedIn));
-      buffer.add8(BigInt(editedProfile.preference1));
-      buffer.add8(BigInt(editedProfile.preference2));
-      buffer.add8(BigInt(editedProfile.preference3));
-
-      toast.info("🔒 Encrypting your updated data...");
-      const ciphertexts = await buffer.encrypt();
-
-      // Get signer and contract
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const signer = await provider.getSigner();
-      const contract = new ethers.Contract(contract_address, ABI, signer);
-
-      toast.warning("👛 Please confirm the transaction in your wallet...");
-
-      // Call updateProfile
-      const tx = await contract.updateProfile(
-        ciphertexts.handles[0], // countryCode
-        ciphertexts.handles[1], // leadingZero
-        ciphertexts.handles[2], // phoneDigits
-        ciphertexts.handles[3], // age
-        ciphertexts.handles[4], // location
-        ciphertexts.handles[5], // gender
-        ciphertexts.handles[6], // interestedIn
-        ciphertexts.handles[7], // preference1
-        ciphertexts.handles[8], // preference2
-        ciphertexts.handles[9], // preference3
-        ciphertexts.inputProof
-      );
-
-      toast.info("⏳ Waiting for blockchain confirmation...");
-      await tx.wait();
-
-      // Update local state
-      const updatedProfile = {
-        ...editedProfile,
-        phoneNumber: phoneInput,
-        countryCode: phoneData.countryCode,
-        leadingZeros: phoneData.leadingZeros,
-        phoneDigits: phoneData.phoneDigits,
-      };
+      const updatedProfile = await toast.promise(updateProfilePromise(), {
+        pending: "🔒 Updating your profile...",
+        success: "🎉 Profile updated successfully!",
+        error: "❌ Failed to update profile. Please try again.",
+      });
 
       setProfile(updatedProfile);
       setEditedProfile(updatedProfile);
       setIsEditing(false);
-      toast.success("🎉 Profile updated successfully!");
-
     } catch (error) {
       console.error("Error updating profile:", error);
-      toast.error("Failed to update profile");
     } finally {
       setIsUpdating(false);
     }
@@ -390,10 +396,13 @@ export function ProfilePage() {
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
             <h2 className="text-2xl font-bold text-white mb-2">
-              {instanceLoading ? "Initializing encryption..." : "Checking registration..."}
+              {instanceLoading
+                ? "Initializing encryption..."
+                : "Checking registration..."}
             </h2>
           </div>
         </div>
+        <ToastContainer position="bottom-center" theme="dark" />
       </div>
     );
   }
@@ -410,10 +419,11 @@ export function ProfilePage() {
                 Profile Not Found
               </h2>
               <p className="text-white/70 mb-6">
-                You haven't registered on LoveChain yet. Create your profile to start finding matches!
+                You haven't registered on FHEarts yet. Create your profile to
+                start finding matches!
               </p>
               <button
-                onClick={() => navigate('/')}
+                onClick={() => navigate("/")}
                 className="bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold py-3 px-8 rounded-lg hover:from-pink-600 hover:to-purple-700 transition-all duration-200"
               >
                 Register Now →
@@ -421,7 +431,7 @@ export function ProfilePage() {
             </div>
           </div>
         </div>
-        <ToastContainer position="top-right" theme="dark" />
+        <ToastContainer position="bottom-center" theme="dark" />
       </>
     );
   }
@@ -440,8 +450,8 @@ export function ProfilePage() {
                 Your Encrypted Profile
               </h2>
               <p className="text-white/70 mb-8">
-                Your profile data is securely encrypted on the blockchain. 
-                Click below to decrypt and view your information.
+                Your profile data is securely encrypted on the blockchain. Click
+                below to decrypt and view your information.
               </p>
               <button
                 onClick={handleDecryptProfile}
@@ -465,7 +475,7 @@ export function ProfilePage() {
             </div>
           </div>
         </div>
-        <ToastContainer position="top-right" theme="dark" />
+        <ToastContainer position="bottom-center" theme="dark" />
       </>
     );
   }
@@ -494,7 +504,9 @@ export function ProfilePage() {
               {isEditing ? (
                 <div className="flex items-center gap-2">
                   <div className="bg-white/10 border border-white/30 rounded-lg px-3 py-3 text-white">
-                    +{LOCATION_TO_COUNTRY_CODE[editedProfile?.location || 0] || 33}
+                    +
+                    {LOCATION_TO_COUNTRY_CODE[editedProfile?.location || 0] ||
+                      33}
                   </div>
                   <input
                     type="tel"
@@ -513,12 +525,20 @@ export function ProfilePage() {
 
             {/* Age */}
             <div>
-              <label className="block text-white/70 font-medium mb-2">Age</label>
+              <label className="block text-white/70 font-medium mb-2">
+                Age
+              </label>
               {isEditing ? (
                 <input
                   type="number"
                   value={editedProfile?.age || ""}
-                  onChange={(e) => setEditedProfile(prev => prev ? {...prev, age: parseInt(e.target.value) || 0} : null)}
+                  onChange={(e) =>
+                    setEditedProfile((prev) =>
+                      prev
+                        ? { ...prev, age: parseInt(e.target.value) || 0 }
+                        : null
+                    )
+                  }
                   min="18"
                   max="100"
                   className="w-full px-4 py-3 bg-white/10 border border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:border-pink-400 focus:ring-2 focus:ring-pink-400/20"
@@ -538,11 +558,21 @@ export function ProfilePage() {
               {isEditing ? (
                 <select
                   value={editedProfile?.location}
-                  onChange={(e) => setEditedProfile(prev => prev ? {...prev, location: parseInt(e.target.value)} : null)}
+                  onChange={(e) =>
+                    setEditedProfile((prev) =>
+                      prev
+                        ? { ...prev, location: parseInt(e.target.value) }
+                        : null
+                    )
+                  }
                   className="w-full px-4 py-3 bg-white/10 border border-white/30 rounded-lg text-white focus:outline-none focus:border-pink-400"
                 >
-                  {LOCATION_OPTIONS.map(opt => (
-                    <option key={opt.value} value={opt.value} className="bg-gray-800">
+                  {LOCATION_OPTIONS.map((opt) => (
+                    <option
+                      key={opt.value}
+                      value={opt.value}
+                      className="bg-gray-800"
+                    >
                       {opt.label}
                     </option>
                   ))}
@@ -561,10 +591,14 @@ export function ProfilePage() {
               </label>
               {isEditing ? (
                 <div className="grid grid-cols-2 gap-2">
-                  {GENDER_OPTIONS.map(opt => (
+                  {GENDER_OPTIONS.map((opt) => (
                     <button
                       key={opt.value}
-                      onClick={() => setEditedProfile(prev => prev ? {...prev, gender: opt.value} : null)}
+                      onClick={() =>
+                        setEditedProfile((prev) =>
+                          prev ? { ...prev, gender: opt.value } : null
+                        )
+                      }
                       className={`px-3 py-2 rounded-lg ${
                         editedProfile?.gender === opt.value
                           ? "bg-pink-500 text-white"
@@ -589,10 +623,14 @@ export function ProfilePage() {
               </label>
               {isEditing ? (
                 <div className="grid grid-cols-2 gap-2">
-                  {INTERESTED_IN_OPTIONS.map(opt => (
+                  {INTERESTED_IN_OPTIONS.map((opt) => (
                     <button
                       key={opt.value}
-                      onClick={() => setEditedProfile(prev => prev ? {...prev, interestedIn: opt.value} : null)}
+                      onClick={() =>
+                        setEditedProfile((prev) =>
+                          prev ? { ...prev, interestedIn: opt.value } : null
+                        )
+                      }
                       className={`px-3 py-2 rounded-lg ${
                         editedProfile?.interestedIn === opt.value
                           ? "bg-purple-500 text-white"
@@ -617,10 +655,14 @@ export function ProfilePage() {
               </label>
               {isEditing ? (
                 <div className="grid grid-cols-2 gap-2">
-                  {MOVIE_OPTIONS.map(opt => (
+                  {MOVIE_OPTIONS.map((opt) => (
                     <button
                       key={opt.value}
-                      onClick={() => setEditedProfile(prev => prev ? {...prev, preference1: opt.value} : null)}
+                      onClick={() =>
+                        setEditedProfile((prev) =>
+                          prev ? { ...prev, preference1: opt.value } : null
+                        )
+                      }
                       className={`px-3 py-2 rounded-lg text-sm ${
                         editedProfile?.preference1 === opt.value
                           ? "bg-indigo-500 text-white"
@@ -645,10 +687,14 @@ export function ProfilePage() {
               </label>
               {isEditing ? (
                 <div className="grid grid-cols-2 gap-2">
-                  {ACTIVITY_OPTIONS.map(opt => (
+                  {ACTIVITY_OPTIONS.map((opt) => (
                     <button
                       key={opt.value}
-                      onClick={() => setEditedProfile(prev => prev ? {...prev, preference2: opt.value} : null)}
+                      onClick={() =>
+                        setEditedProfile((prev) =>
+                          prev ? { ...prev, preference2: opt.value } : null
+                        )
+                      }
                       className={`px-3 py-2 rounded-lg text-sm ${
                         editedProfile?.preference2 === opt.value
                           ? "bg-green-500 text-white"
@@ -673,10 +719,14 @@ export function ProfilePage() {
               </label>
               {isEditing ? (
                 <div className="flex gap-2">
-                  {PERSONALITY_OPTIONS.map(opt => (
+                  {PERSONALITY_OPTIONS.map((opt) => (
                     <button
                       key={opt.value}
-                      onClick={() => setEditedProfile(prev => prev ? {...prev, preference3: opt.value} : null)}
+                      onClick={() =>
+                        setEditedProfile((prev) =>
+                          prev ? { ...prev, preference3: opt.value } : null
+                        )
+                      }
                       className={`flex-1 px-4 py-3 rounded-lg ${
                         editedProfile?.preference3 === opt.value
                           ? "bg-orange-500 text-white"
@@ -740,7 +790,7 @@ export function ProfilePage() {
           </div>
         </div>
       </div>
-      <ToastContainer position="top-right" theme="dark" />
+      <ToastContainer position="bottom-center" theme="dark" />
     </>
   );
 }
