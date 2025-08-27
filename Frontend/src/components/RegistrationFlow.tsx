@@ -263,7 +263,7 @@ export function RegistrationFlow({
   const handleBack = () => {
     // Don't allow navigation while submitting
     if (isSubmitting) return;
-    
+
     if (isFirstStep) {
       onBack();
       return;
@@ -565,7 +565,9 @@ export function RegistrationFlow({
                   Registration in Progress
                 </p>
                 <p className="text-white/70 text-sm">
-                  Please do not close this window or navigate away. The encryption and blockchain transaction process may take up to 30 seconds.
+                  Please do not close this window or navigate away. The
+                  encryption and blockchain transaction process may take up to
+                  30 seconds.
                 </p>
                 <div className="mt-2 flex items-center gap-2">
                   <div className="animate-pulse bg-yellow-400 h-2 w-2 rounded-full"></div>
@@ -575,40 +577,6 @@ export function RegistrationFlow({
                 </div>
               </div>
             </div>
-          </div>
-        )}
-
-        {/* Data Preview for Development */}
-        {process.env.NODE_ENV === "development" && (
-          <div className="mt-8 p-4 bg-black/20 rounded-lg">
-            <h3 className="text-white text-sm font-semibold mb-2">
-              Debug - Form Data:
-            </h3>
-            <pre className="text-white/70 text-xs overflow-auto">
-              {JSON.stringify(
-                {
-                  ...formData,
-                  ...(currentStep === 1 && phoneInput
-                    ? parsePhoneNumber(getCountryCodeFromLocation(), phoneInput)
-                    : {}),
-                },
-                null,
-                2
-              )}
-            </pre>
-            {phoneInput && (
-              <div className="mt-2 text-white/70 text-xs">
-                <p>
-                  Phone Preview: +{getCountryCodeFromLocation()} {phoneInput}
-                </p>
-                <p>
-                  Parsed:{" "}
-                  {JSON.stringify(
-                    parsePhoneNumber(getCountryCodeFromLocation(), phoneInput)
-                  )}
-                </p>
-              </div>
-            )}
           </div>
         )}
       </div>
