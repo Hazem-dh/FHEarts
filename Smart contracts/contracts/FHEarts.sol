@@ -129,75 +129,78 @@ contract FHEarts is SepoliaConfig, Ownable {
     }
 
     /**
-     * @notice Search for the single best match among all users
-     */
-    function searchMatches() external onlyRegistered {
-        UserProfile storage myProfile = profiles[msg.sender];
+ * @notice Search for the single best match among all users
+ */
+function searchMatches() external onlyRegistered {
+    // Revert if there's only 1 or no active users (can't match with yourself)
+    require(activeUsersCount > 1, "Not enough users for matching");
+    
+    UserProfile storage myProfile = profiles[msg.sender];
+    
+    // Initialize with zeros
+    euint8 maxScore = FHE.asEuint8(0);
+    euint64 maxScoreIndex = FHE.asEuint64(0);
+    FHE.allowThis(maxScore);
+    FHE.allowThis(maxScoreIndex);
+    
+    // Search through all active users
+    for (uint64 i = 1; i <= activeUsersCount; i++) {
+        address candidateAddr = IndexToAddress[i];
         
-        // Initialize with zeros
-        euint8 maxScore = FHE.asEuint8(0);
-        euint64 maxScoreIndex = FHE.asEuint64(0);
-        FHE.allowThis(maxScore);
-        FHE.allowThis(maxScoreIndex);
-        
-        // Search through all active users
-        for (uint64 i = 1; i <= activeUsersCount; i++) {
-            address candidateAddr = IndexToAddress[i];
-            
-            // Skip self and inactive users
-            if (candidateAddr == msg.sender || !profiles[candidateAddr].isActive) {
-                continue;
-            }
-            
-            UserProfile storage candidate = profiles[candidateAddr];
-            
-            // Check gender compatibility
-            ebool genderMatch = FHE.eq(myProfile.interestedIn, candidate.gender);
-            ebool reverseGenderMatch = FHE.eq(candidate.interestedIn, myProfile.gender);
-            ebool bothGenderMatch = FHE.and(genderMatch, reverseGenderMatch);
-            
-            // Allow contract to work with these boolean values
-            FHE.allowThis(genderMatch);
-            FHE.allowThis(reverseGenderMatch);
-            FHE.allowThis(bothGenderMatch);
-            
-            // Calculate preference score (each preference worth ~33 points, total 100)
-            euint8 pref1Score = calculatePreferenceScore(myProfile.preference1, candidate.preference1);
-            euint8 pref2Score = calculatePreferenceScore(myProfile.preference2, candidate.preference2);
-            euint8 pref3Score = calculatePreferenceScore(myProfile.preference3, candidate.preference3);
-            
-            euint8 totalScore = FHE.add(FHE.add(pref1Score, pref2Score), pref3Score);
-            FHE.allowThis(totalScore);
-            
-            // Only consider if gender matches
-            euint8 finalScore = FHE.select(bothGenderMatch, totalScore, FHE.asEuint8(0));
-            FHE.allowThis(finalScore);
-            
-            // Update max score if this is better
-            ebool isBetterScore = FHE.gt(finalScore, maxScore);
-            FHE.allowThis(isBetterScore);
-            
-            euint8 newMaxScore = FHE.select(isBetterScore, finalScore, maxScore);
-            euint64 newMaxScoreIndex = FHE.select(isBetterScore, FHE.asEuint64(i), maxScoreIndex);
-            
-            FHE.allowThis(newMaxScore);
-            FHE.allowThis(newMaxScoreIndex);
-            
-            maxScore = newMaxScore;
-            maxScoreIndex = newMaxScoreIndex;
+        // Skip self and inactive users
+        if (candidateAddr == msg.sender || !profiles[candidateAddr].isActive) {
+            continue;
         }
         
-        // Store the best match found
-        userBestMatch[msg.sender] = Match({
-            score: maxScore,
-            matchIndex: maxScoreIndex,
-            isValid: true
-        });
+        UserProfile storage candidate = profiles[candidateAddr];
         
-        // Allow user to decrypt this match
-        FHE.allow(maxScore, msg.sender);
-        FHE.allow(maxScoreIndex, msg.sender);
+        // Check gender compatibility
+        ebool genderMatch = FHE.eq(myProfile.interestedIn, candidate.gender);
+        ebool reverseGenderMatch = FHE.eq(candidate.interestedIn, myProfile.gender);
+        ebool bothGenderMatch = FHE.and(genderMatch, reverseGenderMatch);
+        
+        // Allow contract to work with these boolean values
+        FHE.allowThis(genderMatch);
+        FHE.allowThis(reverseGenderMatch);
+        FHE.allowThis(bothGenderMatch);
+        
+        // Calculate preference score (each preference worth ~33 points, total 100)
+        euint8 pref1Score = calculatePreferenceScore(myProfile.preference1, candidate.preference1);
+        euint8 pref2Score = calculatePreferenceScore(myProfile.preference2, candidate.preference2);
+        euint8 pref3Score = calculatePreferenceScore(myProfile.preference3, candidate.preference3);
+        
+        euint8 totalScore = FHE.add(FHE.add(pref1Score, pref2Score), pref3Score);
+        FHE.allowThis(totalScore);
+        
+        // Only consider if gender matches
+        euint8 finalScore = FHE.select(bothGenderMatch, totalScore, FHE.asEuint8(0));
+        FHE.allowThis(finalScore);
+        
+        // Update max score if this is better
+        ebool isBetterScore = FHE.gt(finalScore, maxScore);
+        FHE.allowThis(isBetterScore);
+        
+        euint8 newMaxScore = FHE.select(isBetterScore, finalScore, maxScore);
+        euint64 newMaxScoreIndex = FHE.select(isBetterScore, FHE.asEuint64(i), maxScoreIndex);
+        
+        FHE.allowThis(newMaxScore);
+        FHE.allowThis(newMaxScoreIndex);
+        
+        maxScore = newMaxScore;
+        maxScoreIndex = newMaxScoreIndex;
     }
+    
+    // Store the best match found
+    userBestMatch[msg.sender] = Match({
+        score: maxScore,
+        matchIndex: maxScoreIndex,
+        isValid: true
+    });
+    
+    // Allow user to decrypt this match
+    FHE.allow(maxScore, msg.sender);
+    FHE.allow(maxScoreIndex, msg.sender);
+}
     
     /**
      * @notice Calculate preference compatibility score
