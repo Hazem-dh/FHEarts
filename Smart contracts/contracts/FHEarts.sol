@@ -28,14 +28,6 @@ contract FHEarts is SepoliaConfig, Ownable {
         bool isValid; // Whether this match slot is used
     }
 
-    struct MatchState {
-        uint8 currentBatch; // Current batch being processed
-        uint8 matchCount; // Number of matches found so far
-        euint8 maxScore; // Current maximum score found
-        euint64 maxScoreIndex; // Index of user with max score
-        bool searchComplete; // Whether search is complete
-    }
-
     // State variables 
     mapping(address => UserProfile) public profiles;
     mapping(address => bool) public isRegistered;
@@ -44,17 +36,14 @@ contract FHEarts is SepoliaConfig, Ownable {
     mapping(uint64 => address) public IndexToAddress;
     mapping(address => uint64) public userActiveIndex;
     
-    // Matching system
-    mapping(address => Match[5]) public userMatches; // Max 5 matches per user
-    mapping(address => MatchState) public matchStates;
+    // Simplified matching system - single best match
+    mapping(address => Match) public userBestMatch;
     
     // Consent and mutual matching
     mapping(address => mapping(address => bool)) public mutualMatches; // user1 => user2 => matched
     mapping(address => mapping(address => bool)) public phoneConsent; // user1 => user2 => consent given
     
-    uint8 public constant BATCH_SIZE = 10;
     uint8 public constant MAX_PREFERENCE_VALUE = 9; // 0-9 for 10 preferences
-    uint8 public constant MAX_MATCHES = 5;
     
     // Modifiers
     modifier onlyRegistered() {
@@ -105,7 +94,6 @@ contract FHEarts is SepoliaConfig, Ownable {
         FHE.allowThis(preference1_);
         FHE.allowThis(preference2_);
         FHE.allowThis(preference3_);
-        FHE.allowThis(countryCode_);
         FHE.allow(countryCode_,msg.sender);
         FHE.allow(leadingZero_,msg.sender);
         FHE.allow(encryptedPhoneNumber_,msg.sender);
@@ -141,34 +129,19 @@ contract FHEarts is SepoliaConfig, Ownable {
     }
 
     /**
-     * @notice Search for matches in batches to handle scalability
+     * @notice Search for the single best match among all users
      */
     function searchMatches() external onlyRegistered {
-        MatchState storage state = matchStates[msg.sender];
-        
-        require(!state.searchComplete, "Search already complete");
-        require(state.matchCount < MAX_MATCHES, "Maximum matches reached");
-        
         UserProfile storage myProfile = profiles[msg.sender];
-        uint64 startIndex = uint64(state.currentBatch) * BATCH_SIZE + 1;
-        uint64 endIndex = startIndex + BATCH_SIZE - 1;
         
-        // Don't exceed total user count
-        if (endIndex > activeUsersCount) {
-            endIndex = activeUsersCount;
-        }
+        // Initialize with zeros
+        euint8 maxScore = FHE.asEuint8(0);
+        euint64 maxScoreIndex = FHE.asEuint64(0);
+        FHE.allowThis(maxScore);
+        FHE.allowThis(maxScoreIndex);
         
-        // Initialize max score for this batch if it's the first iteration
-        if (state.currentBatch == 0) {
-            state.maxScore = FHE.asEuint8(0);
-            state.maxScoreIndex = FHE.asEuint64(0);
-            
-            // Allow contract to manipulate these values
-            FHE.allowThis(state.maxScore);
-            FHE.allowThis(state.maxScoreIndex);
-        }
-        
-        for (uint64 i = startIndex; i <= endIndex; i++) {
+        // Search through all active users
+        for (uint64 i = 1; i <= activeUsersCount; i++) {
             address candidateAddr = IndexToAddress[i];
             
             // Skip self and inactive users
@@ -201,37 +174,29 @@ contract FHEarts is SepoliaConfig, Ownable {
             FHE.allowThis(finalScore);
             
             // Update max score if this is better
-            ebool isBetterScore = FHE.gt(finalScore, state.maxScore);
+            ebool isBetterScore = FHE.gt(finalScore, maxScore);
             FHE.allowThis(isBetterScore);
             
-            euint8 newMaxScore = FHE.select(isBetterScore, finalScore, state.maxScore);
-            euint64 newMaxScoreIndex = FHE.select(isBetterScore, FHE.asEuint64(i), state.maxScoreIndex);
+            euint8 newMaxScore = FHE.select(isBetterScore, finalScore, maxScore);
+            euint64 newMaxScoreIndex = FHE.select(isBetterScore, FHE.asEuint64(i), maxScoreIndex);
             
             FHE.allowThis(newMaxScore);
             FHE.allowThis(newMaxScoreIndex);
             
-            state.maxScore = newMaxScore;
-            state.maxScoreIndex = newMaxScoreIndex;
+            maxScore = newMaxScore;
+            maxScoreIndex = newMaxScoreIndex;
         }
         
-        state.currentBatch++;
+        // Store the best match found
+        userBestMatch[msg.sender] = Match({
+            score: maxScore,
+            matchIndex: maxScoreIndex,
+            isValid: true
+        });
         
-        // Check if search is complete
-        if (endIndex >= activeUsersCount) {
-            state.searchComplete = true;
-            
-            // Store the best match found
-            userMatches[msg.sender][state.matchCount] = Match({
-                score: state.maxScore,
-                matchIndex: state.maxScoreIndex,
-                isValid: true
-            });
-            state.matchCount++;
-            
-            // Allow user to decrypt this match
-            FHE.allow(state.maxScore, msg.sender);
-            FHE.allow(state.maxScoreIndex, msg.sender);
-        }
+        // Allow user to decrypt this match
+        FHE.allow(maxScore, msg.sender);
+        FHE.allow(maxScoreIndex, msg.sender);
     }
     
     /**
@@ -295,7 +260,7 @@ contract FHEarts is SepoliaConfig, Ownable {
     }
     
     /**
-     * @notice Update user profile and reset all matches
+     * @notice Update user profile and reset match
      */
     function updateProfile(
         externalEuint8 countryCode,
@@ -333,7 +298,6 @@ contract FHEarts is SepoliaConfig, Ownable {
         FHE.allowThis(preference1_);
         FHE.allowThis(preference2_);
         FHE.allowThis(preference3_);
-        FHE.allowThis(countryCode_);
         FHE.allow(countryCode_,msg.sender);
         FHE.allow(leadingZero_,msg.sender);
         FHE.allow(encryptedPhoneNumber_,msg.sender);
@@ -359,25 +323,8 @@ contract FHEarts is SepoliaConfig, Ownable {
         profile.preference3 = preference3_;
         profile.isActive = true; // Reactivate profile if it was deactivated
 
-        // Reset match state
-        MatchState storage state = matchStates[msg.sender];
-        state.currentBatch = 0;
-        state.matchCount = 0;
-        
-        // Create new encrypted zeros with allowThis
-        euint8 zeroScore = FHE.asEuint8(0);
-        euint64 zeroIndex = FHE.asEuint64(0);
-        FHE.allowThis(zeroScore);
-        FHE.allowThis(zeroIndex);
-        
-        state.maxScore = zeroScore;
-        state.maxScoreIndex = zeroIndex;
-        state.searchComplete = false;
-
-        // Clear existing matches
-        for (uint8 i = 0; i < MAX_MATCHES; i++) {
-            userMatches[msg.sender][i].isValid = false;
-        }
+        // Clear existing match
+        userBestMatch[msg.sender].isValid = false;
 
         // Clear all mutual matches and consent involving this user
         for (uint64 i = 1; i <= activeUsersCount; i++) {
@@ -395,27 +342,10 @@ contract FHEarts is SepoliaConfig, Ownable {
     }
 
     /**
-     * @notice Reset user's match search to start over
+     * @notice Clear user's current match to search again
      */
-    function resetMatchSearch() external onlyRegistered {
-        MatchState storage state = matchStates[msg.sender];
-        state.currentBatch = 0;
-        state.matchCount = 0;
-        
-        // Create new encrypted zeros with allowThis
-        euint8 zeroScore = FHE.asEuint8(0);
-        euint64 zeroIndex = FHE.asEuint64(0);
-        FHE.allowThis(zeroScore);
-        FHE.allowThis(zeroIndex);
-        
-        state.maxScore = zeroScore;
-        state.maxScoreIndex = zeroIndex;
-        state.searchComplete = false;
-        
-        // Clear existing matches
-        for (uint8 i = 0; i < MAX_MATCHES; i++) {
-            userMatches[msg.sender][i].isValid = false;
-        }
+    function clearMatch() external onlyRegistered {
+        userBestMatch[msg.sender].isValid = false;
     }
     
     /**
@@ -449,68 +379,59 @@ contract FHEarts is SepoliaConfig, Ownable {
         return result;
     }
     
-/**
- * @notice Retrieves the encrypted profile data of a given user for frontend decryption.
- * @param userAddress The address of the user whose profile is being requested.
- * @return countryCode Encrypted country code of the user.
- * @return leadingZero Encrypted indicator for a leading zero in the phone number.
- * @return encryptedPhoneNumber Encrypted phone number of the user.
- * @return age Encrypted age of the user.
- * @return location Encrypted location of the user.
- * @return gender Encrypted gender of the user.
- * @return interestedIn Encrypted interest preference of the user.
- * @return preference1 Encrypted first preference field.
- * @return preference2 Encrypted second preference field.
- * @return preference3 Encrypted third preference field.
- * @return isActive Boolean flag indicating whether the profile is currently active.
- */
-function getProfile(address userAddress) external view  returns (
-    
-    euint8 countryCode,
-    euint8 leadingZero,
-    euint64 encryptedPhoneNumber,
-    euint8 age,
-    euint8 location,
-    euint8 gender,
-    euint8 interestedIn,
-    euint8 preference1,
-    euint8 preference2,
-    euint8 preference3,
-    bool isActive
-    
-) {
-    UserProfile storage profile = profiles[userAddress];
-    
-    return (
-        profile.countryCode,
-        profile.leadingZero,
-        profile.encryptedPhoneNumber,
-        profile.age,
-        profile.location,
-        profile.gender,
-        profile.interestedIn,
-        profile.preference1,
-        profile.preference2,
-        profile.preference3,
-        profile.isActive
-        
-    );
-}
-
-/**
- * @notice Check if a specific user is registered
- * @param user The address to check
- * @return registered Whether the user is registered
- */
-function isUserRegistered(address user) external view returns (bool) {
-    return isRegistered[user];
-}
     /**
-     * @notice Get user's match count and search status
+     * @notice Retrieves the encrypted profile data of a given user for frontend decryption.
      */
-    function getMatchStatus(address user) external view returns (uint8 matchCount, uint8 currentBatch, bool searchComplete) {
-        MatchState storage state = matchStates[user];
-        return (state.matchCount, state.currentBatch, state.searchComplete);
+    function getProfile(address userAddress) external view returns (
+        euint8 countryCode,
+        euint8 leadingZero,
+        euint64 encryptedPhoneNumber,
+        euint8 age,
+        euint8 location,
+        euint8 gender,
+        euint8 interestedIn,
+        euint8 preference1,
+        euint8 preference2,
+        euint8 preference3,
+        bool isActive
+    ) {
+        UserProfile storage profile = profiles[userAddress];
+        
+        return (
+            profile.countryCode,
+            profile.leadingZero,
+            profile.encryptedPhoneNumber,
+            profile.age,
+            profile.location,
+            profile.gender,
+            profile.interestedIn,
+            profile.preference1,
+            profile.preference2,
+            profile.preference3,
+            profile.isActive
+        );
+    }
+
+    /**
+     * @notice Check if a specific user is registered
+     */
+    function isUserRegistered(address user) external view returns (bool) {
+        return isRegistered[user];
+    }
+
+    /**
+     * @notice Get user's best match
+     */
+    function getBestMatch(address user) external view returns (euint8 score, euint64 matchIndex, bool isValid) {
+        Match storage matched = userBestMatch[user];
+        return (matched.score, matched.matchIndex, matched.isValid);
+    }
+    
+    /**
+     * @notice Check if user has found a match
+     */
+    function hasMatch(address user) external view returns (bool) {
+        return userBestMatch[user].isValid;
     }
     
     /**

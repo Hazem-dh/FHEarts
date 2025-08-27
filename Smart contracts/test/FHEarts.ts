@@ -139,26 +139,21 @@ describe("FHEarts Dating Contract", function () {
     });
   });
 
-  describe("Realistic Matching Flow", function () {
-    it("Alice searches and finds encrypted match", async function () {
-      // Alice searches for matches
+  describe("Simplified Matching Flow", function () {
+    it("Alice searches and finds encrypted best match", async function () {
+      // Alice searches for matches (processes all users in one transaction)
       await FHEartsContract.connect(signers.alice).searchMatches();
 
-      // Verify search is complete
-      const [matchCount, , searchComplete] =
-        await FHEartsContract.getMatchStatus(signers.alice.address);
+      // Verify Alice has found a match
+      const hasMatch = await FHEartsContract.hasMatch(signers.alice.address);
+      expect(hasMatch).to.be.true;
 
-      expect(searchComplete).to.be.true;
-      expect(matchCount).to.equal(1);
-
-      // Get the encrypted match data
-      const match = await FHEartsContract.userMatches(signers.alice.address, 0);
-      expect(match.isValid).to.be.true;
+      // Get the encrypted best match data
+      const [encryptedScore, encryptedMatchIndex, isValid] =
+        await FHEartsContract.getBestMatch(signers.alice.address);
+      expect(isValid).to.be.true;
 
       // In a real scenario, Alice would decrypt the matchIndex to find out who she matched with
-      // For testing, we'll decrypt the encrypted index
-      const encryptedMatchIndex = match.matchIndex;
-
       // Decrypt the match index (Alice needs to decrypt to know who she matched with)
       const decryptedIndex = await fhevm.userDecryptEuint(
         FhevmType.euint64,
@@ -177,7 +172,6 @@ describe("FHEarts Dating Contract", function () {
       );
 
       // Alice can also decrypt the match score to see compatibility
-      const encryptedScore = match.score;
       const decryptedScore = await fhevm.userDecryptEuint(
         FhevmType.euint8,
         encryptedScore,
@@ -203,13 +197,15 @@ describe("FHEarts Dating Contract", function () {
       // Bob searches for matches
       await FHEartsContract.connect(signers.bob).searchMatches();
 
-      // Get Bob's encrypted match
-      const match = await FHEartsContract.userMatches(signers.bob.address, 0);
+      // Get Bob's encrypted best match
+      const [, encryptedMatchIndex, isValid] =
+        await FHEartsContract.getBestMatch(signers.bob.address);
+      expect(isValid).to.be.true;
 
       // Bob decrypts the match index
       const decryptedIndex = await fhevm.userDecryptEuint(
         FhevmType.euint64,
-        match.matchIndex,
+        encryptedMatchIndex,
         fheFHEartsContractAddress,
         signers.bob
       );
@@ -330,16 +326,15 @@ describe("FHEarts Dating Contract", function () {
       // Charlie searches for matches
       await FHEartsContract.connect(signers.charlie).searchMatches();
 
-      // Get Charlie's match
-      const match = await FHEartsContract.userMatches(
-        signers.charlie.address,
-        0
-      );
+      // Get Charlie's best match
+      const [, encryptedMatchIndex, isValid] =
+        await FHEartsContract.getBestMatch(signers.charlie.address);
+      expect(isValid).to.be.true;
 
       // Charlie decrypts to find his match
       const decryptedIndex = await fhevm.userDecryptEuint(
         FhevmType.euint64,
-        match.matchIndex,
+        encryptedMatchIndex,
         fheFHEartsContractAddress,
         signers.charlie
       );
@@ -376,6 +371,24 @@ describe("FHEarts Dating Contract", function () {
           signers.charlie.address
         )
       ).to.be.false;
+    });
+  });
+
+  describe("Match Management", function () {
+    it("Should allow users to clear their match and search again", async function () {
+      // Alice clears her current match
+      await FHEartsContract.connect(signers.alice).clearMatch();
+
+      // Verify match is cleared
+      const hasMatch = await FHEartsContract.hasMatch(signers.alice.address);
+      expect(hasMatch).to.be.false;
+
+      // Alice can search again
+      await FHEartsContract.connect(signers.alice).searchMatches();
+
+      // Should have a match again
+      const hasNewMatch = await FHEartsContract.hasMatch(signers.alice.address);
+      expect(hasNewMatch).to.be.true;
     });
   });
 
@@ -427,10 +440,47 @@ describe("FHEarts Dating Contract", function () {
         )
       ).to.be.false;
 
-      const [matchCount, , searchComplete] =
-        await FHEartsContract.getMatchStatus(signers.alice.address);
-      expect(matchCount).to.equal(0);
-      expect(searchComplete).to.be.false;
+      // Match should be cleared
+      const hasMatch = await FHEartsContract.hasMatch(signers.alice.address);
+      expect(hasMatch).to.be.false;
+    });
+  });
+
+  describe("Profile Activation", function () {
+    it("Should allow users to deactivate and reactivate profiles", async function () {
+      // Deactivate Alice's profile
+      await FHEartsContract.connect(signers.alice).deactivateProfile();
+
+      // Check profile is inactive
+      const aliceProfile = await FHEartsContract.profiles(
+        signers.alice.address
+      );
+      expect(aliceProfile.isActive).to.be.false;
+
+      // Reactivate profile
+      await FHEartsContract.connect(signers.alice).reactivateProfile();
+
+      // Check profile is active again
+      const reactivatedProfile = await FHEartsContract.profiles(
+        signers.alice.address
+      );
+      expect(reactivatedProfile.isActive).to.be.true;
+    });
+  });
+
+  describe("View Functions", function () {
+    it("Should correctly identify registered users", async function () {
+      expect(await FHEartsContract.isUserRegistered(signers.alice.address)).to
+        .be.true;
+      expect(await FHEartsContract.isUserRegistered(signers.deployer.address))
+        .to.be.false;
+    });
+
+    it("Should return user profile data", async function () {
+      const profile = await FHEartsContract.getProfile(signers.bob.address);
+      expect(profile.isActive).to.be.true;
+      expect(profile.countryCode).to.not.be.undefined;
+      expect(profile.encryptedPhoneNumber).to.not.be.undefined;
     });
   });
 });
