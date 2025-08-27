@@ -6,18 +6,20 @@ import { usePublicClient, useAccount } from "wagmi";
 import { RegistrationFlow } from "../components/RegistrationFlow";
 import { useInstance } from "../hooks/useInstance";
 import { ethers } from "ethers";
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 interface RegistrationData {
-  leadingZeros: number; // euint8 - Count of leading zeros
-  countryCode: number; // euint8 - Country code as number
-  phoneDigits: number; // euint64 - Phone digits without leading zeros
+  leadingZeros: number;
+  countryCode: number;
+  phoneDigits: number;
   age: number;
-  location: number; // City/region code
-  gender: number; // 0 for male, 1 for female, 2 for non-binary, 3 for other
-  interestedIn: number; // 0 for male, 1 for female, 2 for non-binary, 3 for other
-  preference1: number; // Movie type (0-4)
-  preference2: number; // Activity (0-4)
-  preference3: number; // Personality type (0-2)
+  location: number;
+  gender: number;
+  interestedIn: number;
+  preference1: number;
+  preference2: number;
+  preference3: number;
 }
 
 export function HomePage() {
@@ -25,6 +27,7 @@ export function HomePage() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const [showRegistration, setShowRegistration] = useState<boolean>(false);
+  const [isRegistering, setIsRegistering] = useState<boolean>(false);
   const navigate = useNavigate();
   const publicClient = usePublicClient();
   const { address } = useAccount();
@@ -58,7 +61,6 @@ export function HomePage() {
     const fetchStatus = async (): Promise<void> => {
       setIsLoading(true);
       try {
-        // Mock delay to simulate blockchain call for better UX
         await new Promise((resolve) => setTimeout(resolve, 1000));
         const status = await checkRegistrationStatus();
         setIsRegistered(status);
@@ -85,6 +87,8 @@ export function HomePage() {
   const handleRegistrationComplete = async (
     formData: RegistrationData
   ): Promise<void> => {
+    setIsRegistering(true);
+    
     try {
       if (!instance) {
         throw new Error("FHE instance not available");
@@ -97,100 +101,127 @@ export function HomePage() {
       console.log("Starting registration with FHE instance:", instance);
       console.log("Registration data:", formData);
 
-      // Create a buffer for values to encrypt and register to the fhevm
+      // Step 1: Create encrypted input buffer
+      toast.info("📦 Creating encrypted input buffer...");
+      
       const buffer = instance.createEncryptedInput(
-        // The address of the contract allowed to interact with the "fresh" ciphertexts
         contract_address,
-        // The address of the entity allowed to import ciphertexts to the contract
         address
       );
 
-      // Add the values with associated data-type methods
-      buffer.add8(BigInt(formData.leadingZeros)); // euint8 - Count of leading zeros
-      buffer.add8(BigInt(formData.countryCode)); // euint8 - Country code as number
-      buffer.add64(BigInt(formData.phoneDigits)); // euint64 - Phone digits without leading zeros
-      buffer.add8(BigInt(formData.age)); // euint8 - Age
-      buffer.add8(BigInt(formData.location)); // euint8 - City/region code
-      buffer.add8(BigInt(formData.gender)); // euint8 - Gender (0-3)
-      buffer.add8(BigInt(formData.interestedIn)); // euint8 - Interested in (0-3)
-      buffer.add8(BigInt(formData.preference1)); // euint8 - Movie type (0-4)
-      buffer.add8(BigInt(formData.preference2)); // euint8 - Activity (0-4)
-      buffer.add8(BigInt(formData.preference3)); // euint8 - Personality type (0-2)
+      // Step 2: Add values to buffer
+      toast.info("🔐 Adding your data to encryption buffer...");
+      
+      buffer.add8(BigInt(formData.leadingZeros));
+      buffer.add8(BigInt(formData.countryCode));
+      buffer.add64(BigInt(formData.phoneDigits));
+      buffer.add8(BigInt(formData.age));
+      buffer.add8(BigInt(formData.location));
+      buffer.add8(BigInt(formData.gender));
+      buffer.add8(BigInt(formData.interestedIn));
+      buffer.add8(BigInt(formData.preference1));
+      buffer.add8(BigInt(formData.preference2));
+      buffer.add8(BigInt(formData.preference3));
 
-      // This will encrypt the values, generate a proof of knowledge for it,
-      // and then upload the ciphertexts using the relayer.
-      // This action will return the list of ciphertext handles.
+      // Step 3: Encrypt the data
+      toast.info("🔒 Encrypting your data with FHE... This may take a moment...");
+      
       console.log("Encrypting data...");
       const ciphertexts = await buffer.encrypt();
-      console.log(ciphertexts);
+      console.log("Ciphertexts generated:", ciphertexts);
+
+      // Step 4: Prepare transaction
+      toast.info("⛓️ Preparing blockchain transaction...");
 
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
       const contract = new ethers.Contract(
-        //@ts-ignore
-        contract_address, // replace with correct chain or dynamic switch
+        contract_address,
         ABI,
         signer
       );
 
-      
+      // Step 5: Send transaction
+      toast.warning("👛 Please confirm the transaction in your wallet...");
 
-// Call registerUser
-const tx = await contract.registerUser(
-  ciphertexts.handles[0], // countryCode
-  ciphertexts.handles[1], // leadingZero
-  ciphertexts.handles[2], // encryptedPhoneNumber
-  ciphertexts.handles[3], // age
-  ciphertexts.handles[4], // location
-  ciphertexts.handles[5], // gender
-  ciphertexts.handles[6], // interestedIn
-  ciphertexts.handles[7], // preference1
-  ciphertexts.handles[8], // preference2
-  ciphertexts.handles[9], // preference3
-  ciphertexts.inputProof   // proof (always the last argument)
-);
+      const tx = await contract.registerUser(
+        ciphertexts.handles[0], // leadingZeros
+        ciphertexts.handles[1], // countryCode
+        ciphertexts.handles[2], // phoneDigits
+        ciphertexts.handles[3], // age
+        ciphertexts.handles[4], // location
+        ciphertexts.handles[5], // gender
+        ciphertexts.handles[6], // interestedIn
+        ciphertexts.handles[7], // preference1
+        ciphertexts.handles[8], // preference2
+        ciphertexts.handles[9], // preference3
+        ciphertexts.inputProof   // proof
+      );
 
-console.log("Tx sent:", tx.hash);
-const receipt = await tx.wait();
-console.log("Tx confirmed:", receipt.blockNumber);
+      console.log("Transaction sent:", tx.hash);
+      toast.info(`📤 Transaction submitted! Hash: ${tx.hash.slice(0, 10)}...`);
 
-      // Simulate successful registration
+      // Step 6: Wait for confirmation
+      toast.info("⏳ Waiting for blockchain confirmation...");
+
+      const receipt = await tx.wait();
+      console.log("Transaction confirmed:", receipt.blockNumber);
+
+      // Success!
+      toast.success("🎉 Registration complete! Welcome to LoveChain!");
+
+      // Update state
       setIsRegistered(true);
       setShowRegistration(false);
+      
+      // Show additional success message
+      setTimeout(() => {
+        toast.info("💕 You can now search for matches!");
+      }, 1000);
 
     } catch (error) {
       console.error("Registration failed:", error);
-      alert(
-        `Registration failed: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
+      
+      // Show error message
+      toast.error(`❌ Registration failed: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`);
+    } finally {
+      setIsRegistering(false);
     }
   };
 
   const handleRegistrationBack = (): void => {
+    if (isRegistering) {
+      toast.warning("⚠️ Registration in progress, please wait...");
+      return;
+    }
     setShowRegistration(false);
   };
 
   const handleSearchMatches = async (): Promise<void> => {
     setIsSearching(true);
+    toast.info("🔍 Searching for your perfect matches...");
+    
     try {
       if (!instance) {
         throw new Error("FHE instance not available");
       }
 
-      // TODO: Replace with actual smart contract transaction using FHE
-      // You can also use the instance here for match searching
       console.log("Searching for matches with FHE instance:", instance);
 
       // Mock delay to simulate blockchain transaction
       await new Promise((resolve) => setTimeout(resolve, 2000));
 
-      alert("Search completed! Check your matches.");
-      navigate("/matches");
+      toast.success("✨ Matches found! Redirecting...");
+
+      setTimeout(() => {
+        navigate("/matches");
+      }, 2000);
+      
     } catch (error) {
       console.error("Error searching for matches:", error);
-      alert("Error searching for matches. Please try again.");
+      toast.error("❌ Error searching for matches. Please try again.");
     } finally {
       setIsSearching(false);
     }
@@ -199,14 +230,25 @@ console.log("Tx confirmed:", receipt.blockNumber);
   // Show registration flow if user clicked register
   if (showRegistration) {
     return (
-      <RegistrationFlow
-        onComplete={
-          handleRegistrationComplete as (
-            data: RegistrationData
-          ) => void | Promise<void>
-        }
-        onBack={handleRegistrationBack}
-      />
+      <>
+        <RegistrationFlow
+          onComplete={handleRegistrationComplete}
+          onBack={handleRegistrationBack}
+          isSubmitting={isRegistering}
+        />
+        <ToastContainer 
+          position="top-right"
+          autoClose={5000}
+          hideProgressBar={false}
+          newestOnTop={true}
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+          theme="dark"
+        />
+      </>
     );
   }
 
@@ -259,93 +301,107 @@ console.log("Tx confirmed:", receipt.blockNumber);
   }
 
   return (
-    <div className="w-full max-w-2xl mx-auto">
-      <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl p-8">
-        <div className="text-center mb-8">
-          <div className="text-6xl mb-4">💖</div>
-          <h1 className="text-4xl font-bold text-white mb-2">
-            Welcome to LoveChain
-          </h1>
-          <p className="text-white/70 text-lg">
-            Decentralized dating powered by blockchain
-          </p>
-        </div>
+    <>
+      <div className="w-full max-w-2xl mx-auto">
+        <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl p-8">
+          <div className="text-center mb-8">
+            <div className="text-6xl mb-4">💖</div>
+            <h1 className="text-4xl font-bold text-white mb-2">
+              Welcome to LoveChain
+            </h1>
+            <p className="text-white/70 text-lg">
+              Decentralized dating powered by blockchain
+            </p>
+          </div>
 
-        {!isRegistered ? (
-          <div className="text-center space-y-6">
-            <div className="bg-white/5 rounded-lg p-6 border border-white/20">
-              <h2 className="text-2xl font-semibold text-white mb-4">
-                Get Started
-              </h2>
-              <p className="text-white/80 mb-6">
-                You need to register your profile on the blockchain to start
-                finding matches. Your data will be encrypted and securely
-                stored.
-              </p>
-              <button
-                onClick={handleRegister}
-                disabled={!instance}
-                className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold py-4 px-8 rounded-lg hover:from-pink-600 hover:to-purple-700 transition-all duration-200 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                📝 Register Profile
-              </button>
-              {!instance && (
-                <p className="text-yellow-400 text-sm mt-2">
-                  Waiting for encryption system to load...
+          {!isRegistered ? (
+            <div className="text-center space-y-6">
+              <div className="bg-white/5 rounded-lg p-6 border border-white/20">
+                <h2 className="text-2xl font-semibold text-white mb-4">
+                  Get Started
+                </h2>
+                <p className="text-white/80 mb-6">
+                  You need to register your profile on the blockchain to start
+                  finding matches. Your data will be encrypted and securely
+                  stored.
                 </p>
-              )}
-            </div>
-
-            <div className="text-white/60 text-sm">
-              <p>✅ Encrypted data storage</p>
-              <p>✅ Decentralized matching</p>
-              <p>✅ Privacy-first approach</p>
-            </div>
-          </div>
-        ) : (
-          <div className="text-center space-y-6">
-            <div className="bg-green-500/20 rounded-lg p-6 border border-green-400/30">
-              <div className="text-4xl mb-2">✅</div>
-              <h2 className="text-2xl font-semibold text-white mb-4">
-                Profile Registered!
-              </h2>
-              <p className="text-white/80 mb-6">
-                Your profile is registered on the blockchain. Ready to find your
-                perfect match?
-              </p>
-              <button
-                onClick={handleSearchMatches}
-                disabled={isSearching || !instance}
-                className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white font-semibold py-4 px-8 rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSearching ? (
-                  <div className="flex items-center justify-center gap-2">
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                    Searching for Matches...
-                  </div>
-                ) : (
-                  "🔍 Search for Matches"
+                <button
+                  onClick={handleRegister}
+                  disabled={!instance}
+                  className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold py-4 px-8 rounded-lg hover:from-pink-600 hover:to-purple-700 transition-all duration-200 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  📝 Register Profile
+                </button>
+                {!instance && (
+                  <p className="text-yellow-400 text-sm mt-2">
+                    Waiting for encryption system to load...
+                  </p>
                 )}
-              </button>
-            </div>
+              </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <button
-                onClick={() => navigate("/profile")}
-                className="bg-white/10 hover:bg-white/20 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200"
-              >
-                👤 Edit Profile
-              </button>
-              <button
-                onClick={() => navigate("/matches")}
-                className="bg-white/10 hover:bg-white/20 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200"
-              >
-                💕 View Matches
-              </button>
+              <div className="text-white/60 text-sm">
+                <p>✅ Encrypted data storage</p>
+                <p>✅ Decentralized matching</p>
+                <p>✅ Privacy-first approach</p>
+              </div>
             </div>
-          </div>
-        )}
+          ) : (
+            <div className="text-center space-y-6">
+              <div className="bg-green-500/20 rounded-lg p-6 border border-green-400/30">
+                <div className="text-4xl mb-2">✅</div>
+                <h2 className="text-2xl font-semibold text-white mb-4">
+                  Profile Registered!
+                </h2>
+                <p className="text-white/80 mb-6">
+                  Your profile is registered on the blockchain. Ready to find your
+                  perfect match?
+                </p>
+                <button
+                  onClick={handleSearchMatches}
+                  disabled={isSearching || !instance}
+                  className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white font-semibold py-4 px-8 rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSearching ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      Searching for Matches...
+                    </div>
+                  ) : (
+                    "🔍 Search for Matches"
+                  )}
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  onClick={() => navigate("/profile")}
+                  className="bg-white/10 hover:bg-white/20 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200"
+                >
+                  👤 Edit Profile
+                </button>
+                <button
+                  onClick={() => navigate("/matches")}
+                  className="bg-white/10 hover:bg-white/20 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200"
+                >
+                  💕 View Matches
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+      <ToastContainer 
+        position="top-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop={true}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="dark"
+      />
+    </>
   );
 }

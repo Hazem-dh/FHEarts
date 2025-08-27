@@ -22,9 +22,11 @@ interface RegistrationStep {
     | { label: string; value: number }[]
     | { label: string; value: string }[];
 }
+
 interface RegistrationFlowProps {
   onComplete: (data: RegistrationData) => void | Promise<void>;
   onBack: () => void;
+  isSubmitting?: boolean; // Add this prop to track submission state from parent
 }
 
 const LOCATION_TO_COUNTRY_CODE = {
@@ -131,11 +133,11 @@ const REGISTRATION_STEPS: RegistrationStep[] = [
 export function RegistrationFlow({
   onComplete,
   onBack,
+  isSubmitting = false, // Default to false if not provided
 }: RegistrationFlowProps) {
   const [currentStep, setCurrentStep] = useState<number>(0);
   const [formData, setFormData] = useState<Partial<RegistrationData>>({});
   const [isTransitioning, setIsTransitioning] = useState<boolean>(false);
-  const [isRegistering, setIsRegistering] = useState<boolean>(false);
 
   // Phone number specific state
   const [phoneInput, setPhoneInput] = useState<string>("");
@@ -198,6 +200,9 @@ export function RegistrationFlow({
   };
 
   const handleNext = () => {
+    // Don't allow navigation while submitting
+    if (isSubmitting) return;
+
     // Special handling for phone number step
     if (currentQuestion.id === "phoneNumber") {
       if (!phoneInput.trim()) {
@@ -256,6 +261,9 @@ export function RegistrationFlow({
   };
 
   const handleBack = () => {
+    // Don't allow navigation while submitting
+    if (isSubmitting) return;
+    
     if (isFirstStep) {
       onBack();
       return;
@@ -342,21 +350,10 @@ export function RegistrationFlow({
       return;
     }
 
-    setIsRegistering(true);
-    try {
-      // Mock registration delay
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      // TODO: Replace with actual smart contract call
-      // The phone data is now split into three fields as required
-      console.log("Registration data for smart contract:", finalFormData);
-      onComplete(finalFormData as RegistrationData);
-    } catch (error) {
-      console.error("Registration failed:", error);
-      alert("Registration failed. Please try again.");
-    } finally {
-      setIsRegistering(false);
-    }
+    // Call the parent's onComplete function
+    // The parent will handle the loading state and toast notifications
+    console.log("Registration data for smart contract:", finalFormData);
+    await onComplete(finalFormData as RegistrationData);
   };
 
   const renderInput = () => {
@@ -407,6 +404,7 @@ export function RegistrationFlow({
                   placeholder="123456789"
                   className="flex-1 px-4 py-3 bg-white/10 border border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:border-pink-400 focus:ring-2 focus:ring-pink-400/20 transition-all"
                   autoFocus
+                  disabled={isSubmitting}
                 />
               </div>
               <p className="text-white/50 text-xs mt-2">
@@ -426,8 +424,9 @@ export function RegistrationFlow({
             placeholder={currentQuestion.placeholder}
             min="18"
             max="100"
-            className="w-full px-4 py-3 bg-white/10 border border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:border-pink-400 focus:ring-2 focus:ring-pink-400/20 transition-all"
+            className="w-full px-4 py-3 bg-white/10 border border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:border-pink-400 focus:ring-2 focus:ring-pink-400/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             autoFocus
+            disabled={isSubmitting}
           />
         );
 
@@ -438,7 +437,8 @@ export function RegistrationFlow({
               <button
                 key={option.value}
                 onClick={() => handleInputChange(option.value)}
-                className={`w-full px-4 py-3 rounded-lg text-left transition-all ${
+                disabled={isSubmitting}
+                className={`w-full px-4 py-3 rounded-lg text-left transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                   value === option.value
                     ? "bg-pink-500 text-white shadow-lg"
                     : "bg-white/10 text-white hover:bg-white/20 border border-white/30"
@@ -521,7 +521,8 @@ export function RegistrationFlow({
         <div className="flex gap-4">
           <button
             onClick={handleBack}
-            className="flex-1 bg-white/10 hover:bg-white/20 text-white font-medium py-3 px-6 rounded-lg transition-all duration-200"
+            disabled={isSubmitting}
+            className="flex-1 bg-white/10 hover:bg-white/20 text-white font-medium py-3 px-6 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isFirstStep ? "← Back to Home" : "← Previous"}
           </button>
@@ -529,27 +530,53 @@ export function RegistrationFlow({
           {isLastStep ? (
             <button
               onClick={handleRegister}
-              disabled={isRegistering}
-              className="flex-1 bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold py-3 px-6 rounded-lg hover:from-pink-600 hover:to-purple-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isSubmitting}
+              className="flex-1 bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold py-3 px-6 rounded-lg hover:from-pink-600 hover:to-purple-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              {isRegistering ? (
-                <div className="flex items-center justify-center gap-2">
+              {isSubmitting ? (
+                <>
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                  Registering on Blockchain...
-                </div>
+                  <span>Processing Registration...</span>
+                </>
               ) : (
-                "✨ Complete Registration"
+                <>
+                  <span>✨ Complete Registration</span>
+                </>
               )}
             </button>
           ) : (
             <button
               onClick={handleNext}
-              className="flex-1 bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold py-3 px-6 rounded-lg hover:from-pink-600 hover:to-purple-700 transition-all duration-200"
+              disabled={isSubmitting}
+              className="flex-1 bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold py-3 px-6 rounded-lg hover:from-pink-600 hover:to-purple-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Next →
             </button>
           )}
         </div>
+
+        {/* Warning message when submitting */}
+        {isSubmitting && (
+          <div className="mt-6 bg-yellow-500/20 border border-yellow-400/30 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl">⚠️</span>
+              <div className="flex-1">
+                <p className="text-yellow-300 font-semibold mb-1">
+                  Registration in Progress
+                </p>
+                <p className="text-white/70 text-sm">
+                  Please do not close this window or navigate away. The encryption and blockchain transaction process may take up to 30 seconds.
+                </p>
+                <div className="mt-2 flex items-center gap-2">
+                  <div className="animate-pulse bg-yellow-400 h-2 w-2 rounded-full"></div>
+                  <span className="text-white/60 text-xs">
+                    Check your wallet for transaction approval
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Data Preview for Development */}
         {process.env.NODE_ENV === "development" && (

@@ -1,342 +1,746 @@
-// ProfilePage.tsx
-import React, { useState, type ChangeEvent } from "react";
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAccount, usePublicClient } from "wagmi";
+import { contract_address } from "../contract/addresses";
+import { ABI } from "../contract/ABI";
+import { useInstance } from "../hooks/useInstance";
+import { toast, ToastContainer } from 'react-toastify';
+import { ethers } from "ethers";
+import 'react-toastify/dist/ReactToastify.css';
 
 interface ProfileData {
   phoneNumber: string;
-  age: string;
-  location: string;
-  preference1: string[]; // Sports preferences
-  preference2: string[]; // Movie preferences
-  preference3: string; // Personality type
+  countryCode: number;
+  leadingZeros: number;
+  phoneDigits: number;
+  age: number;
+  location: number;
+  gender: number;
+  interestedIn: number;
+  preference1: number;
+  preference2: number;
+  preference3: number;
+  isActive: boolean;
 }
 
+// Type for the contract return value
+type ProfileContractResult = readonly [
+  string,  // userAddress
+  bigint,  // countryCode (euint8)
+  bigint,  // leadingZero (euint8)
+  bigint,  // encryptedPhoneNumber (euint64)
+  bigint,  // age (euint8)
+  bigint,  // location (euint8)
+  bigint,  // gender (euint8)
+  bigint,  // interestedIn (euint8)
+  bigint,  // preference1 (euint8)
+  bigint,  // preference2 (euint8)
+  bigint,  // preference3 (euint8)
+  boolean  // isActive
+];
+
+// Mapping data
+const LOCATION_OPTIONS = [
+  { label: "🇫🇷 France", value: 0 },
+  { label: "🇩🇪 Germany", value: 1 },
+  { label: "🇪🇸 Spain", value: 2 },
+  { label: "🇮🇹 Italy", value: 3 },
+  { label: "🇳🇱 Netherlands", value: 4 },
+  { label: "🇧🇪 Belgium", value: 5 },
+  { label: "🇨🇭 Switzerland", value: 6 },
+  { label: "🇦🇹 Austria", value: 7 },
+  { label: "🇵🇹 Portugal", value: 8 },
+  { label: "🇸🇪 Sweden", value: 9 },
+];
+
+const LOCATION_TO_COUNTRY_CODE: { [key: number]: number } = {
+  0: 33,   // France
+  1: 49,   // Germany
+  2: 34,   // Spain
+  3: 39,   // Italy
+  4: 31,   // Netherlands
+  5: 32,   // Belgium
+  6: 41,   // Switzerland
+  7: 43,   // Austria
+  8: 351,  // Portugal
+  9: 46,   // Sweden
+};
+
+const GENDER_OPTIONS = [
+  { label: "Male", value: 0 },
+  { label: "Female", value: 1 },
+  { label: "Non-binary", value: 2 },
+  { label: "Other", value: 3 },
+];
+
+const INTERESTED_IN_OPTIONS = [
+  { label: "Men", value: 0 },
+  { label: "Women", value: 1 },
+  { label: "Non-binary", value: 2 },
+  { label: "Other", value: 3 },
+];
+
+const MOVIE_OPTIONS = [
+  { label: "Action/Adventure", value: 0 },
+  { label: "Romance/Comedy", value: 1 },
+  { label: "Horror/Thriller", value: 2 },
+  { label: "Drama/Documentary", value: 3 },
+  { label: "Sci-Fi/Fantasy", value: 4 },
+];
+
+const ACTIVITY_OPTIONS = [
+  { label: "Outdoor Adventures", value: 0 },
+  { label: "Cultural Events", value: 1 },
+  { label: "Sports & Fitness", value: 2 },
+  { label: "Cooking & Dining", value: 3 },
+  { label: "Gaming & Technology", value: 4 },
+];
+
+const PERSONALITY_OPTIONS = [
+  { label: "Introvert", value: 0 },
+  { label: "Extrovert", value: 1 },
+  { label: "Ambivert", value: 2 },
+];
+
 export function ProfilePage() {
-  const [profile, setProfile] = useState<ProfileData>({
-    phoneNumber: "",
-    age: "",
-    location: "",
-    preference1: [], // Sports preferences
-    preference2: [], // Movie preferences
-    preference3: "", // Personality type
-  });
-
+  const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [editedProfile, setEditedProfile] = useState<ProfileData | null>(null);
+  const [isRegistered, setIsRegistered] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isDecrypting, setIsDecrypting] = useState<boolean>(false);
+  const [isUpdating, setIsUpdating] = useState<boolean>(false);
+  const [hasDecrypted, setHasDecrypted] = useState<boolean>(false);
   const [isEditing, setIsEditing] = useState<boolean>(false);
+  const [phoneInput, setPhoneInput] = useState<string>("");
+  
+  const navigate = useNavigate();
+  const { address } = useAccount();
+  const publicClient = usePublicClient();
+  const { instance, isLoading: instanceLoading } = useInstance();
 
-  // Options for preferences
-  const sportOptions: string[] = [
-    "Football",
-    "Basketball",
-    "Tennis",
-    "Swimming",
-    "Running",
-    "Cycling",
-    "Yoga",
-    "Gym",
-    "Soccer",
-    "Baseball",
-    "Golf",
-    "Hiking",
-  ];
-
-  const movieOptions: string[] = [
-    "Action",
-    "Comedy",
-    "Drama",
-    "Horror",
-    "Romance",
-    "Sci-Fi",
-    "Thriller",
-    "Documentary",
-    "Animation",
-    "Fantasy",
-    "Mystery",
-    "Adventure",
-  ];
-
-  const personalityOptions: string[] = ["Introvert", "Extrovert", "Ambivert"];
-
-  const locationOptions: string[] = [
-    "New York",
-    "Los Angeles",
-    "Chicago",
-    "Houston",
-    "Phoenix",
-    "Philadelphia",
-    "San Antonio",
-    "San Diego",
-    "Dallas",
-    "San Jose",
-    "Austin",
-    "Jacksonville",
-  ];
-
-  const handleInputChange = (
-    e: ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ): void => {
-    const { name, value } = e.target;
-    setProfile((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  const handleMultiSelect = (
-    category: keyof Pick<ProfileData, "preference1" | "preference2">,
-    option: string
-  ): void => {
-    setProfile((prev) => {
-      const current = prev[category] || [];
-      if (current.includes(option)) {
-        return {
-          ...prev,
-          [category]: current.filter((item) => item !== option),
-        };
-      } else if (current.length < 3) {
-        return {
-          ...prev,
-          [category]: [...current, option],
-        };
+  // Check if user is registered
+  useEffect(() => {
+    const checkRegistration = async () => {
+      if (!publicClient || !address) {
+        setIsLoading(false);
+        return;
       }
-      return prev;
-    });
+
+      try {
+        const result = await publicClient.readContract({
+          address: contract_address,
+          abi: ABI,
+          functionName: "isRegistered",
+          args: [address],
+        });
+        
+        setIsRegistered(Boolean(result));
+      } catch (error) {
+        console.error("Error checking registration:", error);
+        setIsRegistered(false);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkRegistration();
+  }, [address, publicClient]);
+
+  const parsePhoneNumber = (countryCode: number, phoneInput: string) => {
+    const digits = phoneInput.replace(/\D/g, "");
+    if (!digits) return null;
+
+    const leadingZeros = digits.match(/^0+/)?.[0]?.length || 0;
+    const phoneDigits = parseInt(digits.replace(/^0+/, "")) || 0;
+
+    return {
+      leadingZeros,
+      countryCode,
+      phoneDigits,
+    };
   };
 
-  const handleSave = async (): Promise<void> => {
+  const handleDecryptProfile = async () => {
+    if (!instance || !publicClient || !address) {
+      toast.error("Please wait for encryption system to load");
+      return;
+    }
+
+    setIsDecrypting(true);
+    toast.info("🔓 Fetching encrypted profile data...");
+
     try {
-      // TODO: Integrate with your smart contract
-      // This would involve encrypting the data and calling registerUser
-      console.log("Saving profile:", profile);
+      // Get signer
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
 
-      // Example of how you might structure the call:
-      // await contract.registerUser(
-      //   encryptedPhoneNumber,
-      //   encryptedAge,
-      //   encryptedLocation,
-      //   encryptedPreference1,
-      //   encryptedPreference2,
-      //   encryptedPreference3,
-      //   inputProof
-      // );
+      // Call getMyProfile to get encrypted data
+      const result = await publicClient.readContract({
+        address: contract_address,
+        abi: ABI,
+        functionName: "getMyProfile",
+        args: [],
+      }) as ProfileContractResult;
 
-      setIsEditing(false);
-      alert("Profile saved successfully!");
+      toast.info("🔐 Generating decryption keys...");
+
+      // Generate keypair for decryption
+      const keypair = instance.generateKeypair();
+
+      // Prepare handle-contract pairs
+      const handleContractPairs = [
+        { handle: result[1].toString(), contractAddress: contract_address }, // countryCode
+        { handle: result[2].toString(), contractAddress: contract_address }, // leadingZero
+        { handle: result[3].toString(), contractAddress: contract_address }, // phoneNumber
+        { handle: result[4].toString(), contractAddress: contract_address }, // age
+        { handle: result[5].toString(), contractAddress: contract_address }, // location
+        { handle: result[6].toString(), contractAddress: contract_address }, // gender
+        { handle: result[7].toString(), contractAddress: contract_address }, // interestedIn
+        { handle: result[8].toString(), contractAddress: contract_address }, // preference1
+        { handle: result[9].toString(), contractAddress: contract_address }, // preference2
+        { handle: result[10].toString(), contractAddress: contract_address }, // preference3
+      ];
+
+      // Create EIP712 signature
+      const startTimeStamp = Math.floor(Date.now() / 1000).toString();
+      const durationDays = "10";
+      const contractAddresses = [contract_address];
+      
+      const eip712 = instance.createEIP712(
+        keypair.publicKey, 
+        contractAddresses, 
+        startTimeStamp, 
+        durationDays
+      );
+
+      toast.info("👛 Please sign the decryption request...");
+
+      const signature = await signer.signTypedData(
+        eip712.domain,
+        {
+          UserDecryptRequestVerification: eip712.types.UserDecryptRequestVerification,
+        },
+        eip712.message,
+      );
+
+      toast.info("🔓 Decrypting your data...");
+
+      // Decrypt all values
+      const decryptResult = await instance.userDecrypt(
+        handleContractPairs,
+        keypair.privateKey,
+        keypair.publicKey,
+        signature.replace("0x", ""),
+        contractAddresses,
+        address,
+        startTimeStamp,
+        durationDays,
+      );
+
+      // Extract decrypted values
+      const countryCode = Number(decryptResult[result[1].toString()]);
+      const leadingZeros = Number(decryptResult[result[2].toString()]);
+      const phoneDigits = Number(decryptResult[result[3].toString()]);
+      const age = Number(decryptResult[result[4].toString()]);
+      const location = Number(decryptResult[result[5].toString()]);
+      const gender = Number(decryptResult[result[6].toString()]);
+      const interestedIn = Number(decryptResult[result[7].toString()]);
+      const preference1 = Number(decryptResult[result[8].toString()]);
+      const preference2 = Number(decryptResult[result[9].toString()]);
+      const preference3 = Number(decryptResult[result[10].toString()]);
+
+      // Reconstruct phone number
+      const zerosString = '0'.repeat(leadingZeros);
+      const fullPhoneNumber = `${zerosString}${phoneDigits}`;
+
+      // Create profile object
+      const decryptedProfile: ProfileData = {
+        phoneNumber: fullPhoneNumber,
+        countryCode,
+        leadingZeros,
+        phoneDigits,
+        age,
+        location,
+        gender,
+        interestedIn,
+        preference1,
+        preference2,
+        preference3,
+        isActive: Boolean(result[11])
+      };
+
+      setProfile(decryptedProfile);
+      setEditedProfile(decryptedProfile);
+      setPhoneInput(fullPhoneNumber);
+      setHasDecrypted(true);
+      toast.success("✅ Profile decrypted successfully!");
+
     } catch (error) {
-      console.error("Error saving profile:", error);
-      alert("Error saving profile. Please try again.");
+      console.error("Error decrypting profile:", error);
+      toast.error("Failed to decrypt profile. Please try again.");
+    } finally {
+      setIsDecrypting(false);
     }
   };
 
-  return (
-    <div className="w-full max-w-2xl mx-auto">
-      <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl p-8">
-        <div className="text-center mb-8">
-          <div className="w-24 h-24 bg-gradient-to-r from-pink-400 to-purple-500 rounded-full mx-auto mb-4 flex items-center justify-center">
-            <span className="text-3xl">👤</span>
-          </div>
-          <h1 className="text-3xl font-bold text-white mb-2">My Profile</h1>
-          <p className="text-white/70">
-            Manage your dating profile (encrypted on-chain)
-          </p>
-        </div>
+  const handleStartEdit = () => {
+    setEditedProfile(profile);
+    setPhoneInput(profile?.phoneNumber || "");
+    setIsEditing(true);
+  };
 
-        <div className="space-y-6">
-          {/* Phone Number */}
-          <div>
-            <label className="block text-white font-medium mb-2">
-              Phone Number
-            </label>
-            {isEditing ? (
-              <input
-                type="tel"
-                name="phoneNumber"
-                value={profile.phoneNumber}
-                onChange={handleInputChange}
-                className="w-full px-4 py-3 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:border-white/50"
-                placeholder="Enter your phone number"
-              />
-            ) : (
-              <div className="px-4 py-3 bg-white/10 rounded-lg text-white">
-                {profile.phoneNumber
-                  ? "***-***-" + profile.phoneNumber.slice(-4)
-                  : "Not set"}
-              </div>
-            )}
-          </div>
+  const handleCancelEdit = () => {
+    setEditedProfile(profile);
+    setPhoneInput(profile?.phoneNumber || "");
+    setIsEditing(false);
+  };
 
-          {/* Age */}
-          <div>
-            <label className="block text-white font-medium mb-2">Age</label>
-            {isEditing ? (
-              <input
-                type="number"
-                name="age"
-                min="18"
-                max="100"
-                value={profile.age}
-                onChange={handleInputChange}
-                className="w-full px-4 py-3 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:border-white/50"
-                placeholder="Enter your age"
-              />
-            ) : (
-              <div className="px-4 py-3 bg-white/10 rounded-lg text-white">
-                {profile.age || "Not set"}
-              </div>
-            )}
-          </div>
+  const handleUpdateProfile = async () => {
+    if (!instance || !address || !editedProfile) {
+      toast.error("Missing required data");
+      return;
+    }
 
-          {/* Location */}
-          <div>
-            <label className="block text-white font-medium mb-2">
-              Location
-            </label>
-            {isEditing ? (
-              <select
-                name="location"
-                value={profile.location}
-                onChange={handleInputChange}
-                className="w-full px-4 py-3 bg-white/20 border border-white/30 rounded-lg text-white focus:outline-none focus:border-white/50"
-              >
-                <option value="" className="bg-gray-800">
-                  Select your location
-                </option>
-                {locationOptions.map((location) => (
-                  <option
-                    key={location}
-                    value={location}
-                    className="bg-gray-800"
-                  >
-                    {location}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <div className="px-4 py-3 bg-white/10 rounded-lg text-white">
-                {profile.location || "Not set"}
-              </div>
-            )}
-          </div>
+    setIsUpdating(true);
+    toast.info("📦 Preparing encrypted update...");
 
-          {/* Sports Preferences */}
-          <div>
-            <label className="block text-white font-medium mb-2">
-              Sports Preferences (Select up to 3)
-            </label>
-            {isEditing ? (
-              <div className="grid grid-cols-2 gap-2">
-                {sportOptions.map((sport) => (
-                  <button
-                    key={sport}
-                    type="button"
-                    onClick={() => handleMultiSelect("preference1", sport)}
-                    className={`px-3 py-2 rounded-lg text-sm transition-all duration-200 ${
-                      profile.preference1?.includes(sport)
-                        ? "bg-pink-500 text-white"
-                        : "bg-white/20 text-white/80 hover:bg-white/30"
-                    }`}
-                  >
-                    {sport}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="px-4 py-3 bg-white/10 rounded-lg text-white">
-                {profile.preference1?.length > 0
-                  ? profile.preference1.join(", ")
-                  : "Not set"}
-              </div>
-            )}
-          </div>
+    try {
+      // Parse phone number
+      const phoneData = parsePhoneNumber(
+        LOCATION_TO_COUNTRY_CODE[editedProfile.location] || 33,
+        phoneInput
+      );
 
-          {/* Movie Preferences */}
-          <div>
-            <label className="block text-white font-medium mb-2">
-              Movie Preferences (Select up to 3)
-            </label>
-            {isEditing ? (
-              <div className="grid grid-cols-2 gap-2">
-                {movieOptions.map((genre) => (
-                  <button
-                    key={genre}
-                    type="button"
-                    onClick={() => handleMultiSelect("preference2", genre)}
-                    className={`px-3 py-2 rounded-lg text-sm transition-all duration-200 ${
-                      profile.preference2?.includes(genre)
-                        ? "bg-purple-500 text-white"
-                        : "bg-white/20 text-white/80 hover:bg-white/30"
-                    }`}
-                  >
-                    {genre}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="px-4 py-3 bg-white/10 rounded-lg text-white">
-                {profile.preference2?.length > 0
-                  ? profile.preference2.join(", ")
-                  : "Not set"}
-              </div>
-            )}
-          </div>
+      if (!phoneData) {
+        toast.error("Invalid phone number");
+        setIsUpdating(false);
+        return;
+      }
 
-          {/* Personality Type */}
-          <div>
-            <label className="block text-white font-medium mb-2">
-              Personality Type
-            </label>
-            {isEditing ? (
-              <div className="flex gap-2">
-                {personalityOptions.map((type) => (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() =>
-                      setProfile((prev) => ({ ...prev, preference3: type }))
-                    }
-                    className={`flex-1 px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
-                      profile.preference3 === type
-                        ? "bg-indigo-500 text-white"
-                        : "bg-white/20 text-white/80 hover:bg-white/30"
-                    }`}
-                  >
-                    {type}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="px-4 py-3 bg-white/10 rounded-lg text-white">
-                {profile.preference3 || "Not set"}
-              </div>
-            )}
-          </div>
+      // Create encrypted input buffer
+      const buffer = instance.createEncryptedInput(contract_address, address);
 
-          {/* Action Buttons */}
-          <div className="flex gap-4 pt-4">
-            {isEditing ? (
-              <>
-                <button
-                  onClick={handleSave}
-                  className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-semibold py-3 px-6 rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200"
-                >
-                  Save to Blockchain
-                </button>
-                <button
-                  onClick={() => setIsEditing(false)}
-                  className="flex-1 bg-white/20 text-white font-semibold py-3 px-6 rounded-lg hover:bg-white/30 transition-all duration-200"
-                >
-                  Cancel
-                </button>
-              </>
-            ) : (
-              <button
-                onClick={() => setIsEditing(true)}
-                className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold py-3 px-6 rounded-lg hover:from-pink-600 hover:to-purple-700 transition-all duration-200"
-              >
-                Edit Profile
-              </button>
-            )}
+      // Add values to buffer
+      buffer.add8(BigInt(phoneData.countryCode));
+      buffer.add8(BigInt(phoneData.leadingZeros));
+      buffer.add64(BigInt(phoneData.phoneDigits));
+      buffer.add8(BigInt(editedProfile.age));
+      buffer.add8(BigInt(editedProfile.location));
+      buffer.add8(BigInt(editedProfile.gender));
+      buffer.add8(BigInt(editedProfile.interestedIn));
+      buffer.add8(BigInt(editedProfile.preference1));
+      buffer.add8(BigInt(editedProfile.preference2));
+      buffer.add8(BigInt(editedProfile.preference3));
+
+      toast.info("🔒 Encrypting your updated data...");
+      const ciphertexts = await buffer.encrypt();
+
+      // Get signer and contract
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const contract = new ethers.Contract(contract_address, ABI, signer);
+
+      toast.warning("👛 Please confirm the transaction in your wallet...");
+
+      // Call updateProfile
+      const tx = await contract.updateProfile(
+        ciphertexts.handles[0], // countryCode
+        ciphertexts.handles[1], // leadingZero
+        ciphertexts.handles[2], // phoneDigits
+        ciphertexts.handles[3], // age
+        ciphertexts.handles[4], // location
+        ciphertexts.handles[5], // gender
+        ciphertexts.handles[6], // interestedIn
+        ciphertexts.handles[7], // preference1
+        ciphertexts.handles[8], // preference2
+        ciphertexts.handles[9], // preference3
+        ciphertexts.inputProof
+      );
+
+      toast.info("⏳ Waiting for blockchain confirmation...");
+      await tx.wait();
+
+      // Update local state
+      const updatedProfile = {
+        ...editedProfile,
+        phoneNumber: phoneInput,
+        countryCode: phoneData.countryCode,
+        leadingZeros: phoneData.leadingZeros,
+        phoneDigits: phoneData.phoneDigits,
+      };
+
+      setProfile(updatedProfile);
+      setEditedProfile(updatedProfile);
+      setIsEditing(false);
+      toast.success("🎉 Profile updated successfully!");
+
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      toast.error("Failed to update profile");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  // Loading state
+  if (isLoading || instanceLoading) {
+    return (
+      <div className="w-full max-w-2xl mx-auto">
+        <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl p-8">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+            <h2 className="text-2xl font-bold text-white mb-2">
+              {instanceLoading ? "Initializing encryption..." : "Checking registration..."}
+            </h2>
           </div>
         </div>
       </div>
-    </div>
+    );
+  }
+
+  // Not registered state
+  if (!isRegistered) {
+    return (
+      <>
+        <div className="w-full max-w-2xl mx-auto">
+          <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl p-8">
+            <div className="text-center">
+              <div className="text-6xl mb-4">🚫</div>
+              <h2 className="text-3xl font-bold text-white mb-4">
+                Profile Not Found
+              </h2>
+              <p className="text-white/70 mb-6">
+                You haven't registered on LoveChain yet. Create your profile to start finding matches!
+              </p>
+              <button
+                onClick={() => navigate('/')}
+                className="bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold py-3 px-8 rounded-lg hover:from-pink-600 hover:to-purple-700 transition-all duration-200"
+              >
+                Register Now →
+              </button>
+            </div>
+          </div>
+        </div>
+        <ToastContainer position="top-right" theme="dark" />
+      </>
+    );
+  }
+
+  // Registered but not decrypted state
+  if (!hasDecrypted) {
+    return (
+      <>
+        <div className="w-full max-w-2xl mx-auto">
+          <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl p-8">
+            <div className="text-center">
+              <div className="w-24 h-24 bg-gradient-to-r from-pink-400 to-purple-500 rounded-full mx-auto mb-6 flex items-center justify-center">
+                <span className="text-4xl">🔒</span>
+              </div>
+              <h2 className="text-3xl font-bold text-white mb-4">
+                Your Encrypted Profile
+              </h2>
+              <p className="text-white/70 mb-8">
+                Your profile data is securely encrypted on the blockchain. 
+                Click below to decrypt and view your information.
+              </p>
+              <button
+                onClick={handleDecryptProfile}
+                disabled={isDecrypting || !instance}
+                className="bg-gradient-to-r from-green-500 to-emerald-600 text-white font-semibold py-4 px-10 rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isDecrypting ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    <span>Decrypting...</span>
+                  </div>
+                ) : (
+                  <>🔓 Decrypt My Profile</>
+                )}
+              </button>
+              {!instance && (
+                <p className="text-yellow-400 text-sm mt-4">
+                  Waiting for encryption system...
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+        <ToastContainer position="top-right" theme="dark" />
+      </>
+    );
+  }
+
+  // Decrypted profile display
+  return (
+    <>
+      <div className="w-full max-w-2xl mx-auto">
+        <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl p-8">
+          <div className="text-center mb-8">
+            <div className="w-24 h-24 bg-gradient-to-r from-pink-400 to-purple-500 rounded-full mx-auto mb-4 flex items-center justify-center">
+              <span className="text-3xl">👤</span>
+            </div>
+            <h1 className="text-3xl font-bold text-white mb-2">My Profile</h1>
+            <p className="text-white/70">
+              {isEditing ? "Edit your profile" : "Your decrypted profile data"}
+            </p>
+          </div>
+
+          <div className="space-y-6">
+            {/* Phone Number */}
+            <div>
+              <label className="block text-white/70 font-medium mb-2">
+                Phone Number
+              </label>
+              {isEditing ? (
+                <div className="flex items-center gap-2">
+                  <div className="bg-white/10 border border-white/30 rounded-lg px-3 py-3 text-white">
+                    +{LOCATION_TO_COUNTRY_CODE[editedProfile?.location || 0] || 33}
+                  </div>
+                  <input
+                    type="tel"
+                    value={phoneInput}
+                    onChange={(e) => setPhoneInput(e.target.value)}
+                    className="flex-1 px-4 py-3 bg-white/10 border border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:border-pink-400 focus:ring-2 focus:ring-pink-400/20"
+                    placeholder="0123456789"
+                  />
+                </div>
+              ) : (
+                <div className="px-4 py-3 bg-white/10 rounded-lg text-white">
+                  +{profile?.countryCode} {profile?.phoneNumber}
+                </div>
+              )}
+            </div>
+
+            {/* Age */}
+            <div>
+              <label className="block text-white/70 font-medium mb-2">Age</label>
+              {isEditing ? (
+                <input
+                  type="number"
+                  value={editedProfile?.age || ""}
+                  onChange={(e) => setEditedProfile(prev => prev ? {...prev, age: parseInt(e.target.value) || 0} : null)}
+                  min="18"
+                  max="100"
+                  className="w-full px-4 py-3 bg-white/10 border border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:border-pink-400 focus:ring-2 focus:ring-pink-400/20"
+                />
+              ) : (
+                <div className="px-4 py-3 bg-white/10 rounded-lg text-white">
+                  {profile?.age}
+                </div>
+              )}
+            </div>
+
+            {/* Location */}
+            <div>
+              <label className="block text-white/70 font-medium mb-2">
+                Location
+              </label>
+              {isEditing ? (
+                <select
+                  value={editedProfile?.location}
+                  onChange={(e) => setEditedProfile(prev => prev ? {...prev, location: parseInt(e.target.value)} : null)}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/30 rounded-lg text-white focus:outline-none focus:border-pink-400"
+                >
+                  {LOCATION_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value} className="bg-gray-800">
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className="px-4 py-3 bg-white/10 rounded-lg text-white">
+                  {LOCATION_OPTIONS[profile?.location || 0]?.label}
+                </div>
+              )}
+            </div>
+
+            {/* Gender */}
+            <div>
+              <label className="block text-white/70 font-medium mb-2">
+                Gender
+              </label>
+              {isEditing ? (
+                <div className="grid grid-cols-2 gap-2">
+                  {GENDER_OPTIONS.map(opt => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setEditedProfile(prev => prev ? {...prev, gender: opt.value} : null)}
+                      className={`px-3 py-2 rounded-lg ${
+                        editedProfile?.gender === opt.value
+                          ? "bg-pink-500 text-white"
+                          : "bg-white/20 text-white/80 hover:bg-white/30"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="px-4 py-3 bg-white/10 rounded-lg text-white">
+                  {GENDER_OPTIONS[profile?.gender || 0]?.label}
+                </div>
+              )}
+            </div>
+
+            {/* Interested In */}
+            <div>
+              <label className="block text-white/70 font-medium mb-2">
+                Interested In
+              </label>
+              {isEditing ? (
+                <div className="grid grid-cols-2 gap-2">
+                  {INTERESTED_IN_OPTIONS.map(opt => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setEditedProfile(prev => prev ? {...prev, interestedIn: opt.value} : null)}
+                      className={`px-3 py-2 rounded-lg ${
+                        editedProfile?.interestedIn === opt.value
+                          ? "bg-purple-500 text-white"
+                          : "bg-white/20 text-white/80 hover:bg-white/30"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="px-4 py-3 bg-white/10 rounded-lg text-white">
+                  {INTERESTED_IN_OPTIONS[profile?.interestedIn || 0]?.label}
+                </div>
+              )}
+            </div>
+
+            {/* Movie Preference */}
+            <div>
+              <label className="block text-white/70 font-medium mb-2">
+                Favorite Movie Genre
+              </label>
+              {isEditing ? (
+                <div className="grid grid-cols-2 gap-2">
+                  {MOVIE_OPTIONS.map(opt => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setEditedProfile(prev => prev ? {...prev, preference1: opt.value} : null)}
+                      className={`px-3 py-2 rounded-lg text-sm ${
+                        editedProfile?.preference1 === opt.value
+                          ? "bg-indigo-500 text-white"
+                          : "bg-white/20 text-white/80 hover:bg-white/30"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="px-4 py-3 bg-white/10 rounded-lg text-white">
+                  {MOVIE_OPTIONS[profile?.preference1 || 0]?.label}
+                </div>
+              )}
+            </div>
+
+            {/* Activity Preference */}
+            <div>
+              <label className="block text-white/70 font-medium mb-2">
+                Favorite Activity
+              </label>
+              {isEditing ? (
+                <div className="grid grid-cols-2 gap-2">
+                  {ACTIVITY_OPTIONS.map(opt => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setEditedProfile(prev => prev ? {...prev, preference2: opt.value} : null)}
+                      className={`px-3 py-2 rounded-lg text-sm ${
+                        editedProfile?.preference2 === opt.value
+                          ? "bg-green-500 text-white"
+                          : "bg-white/20 text-white/80 hover:bg-white/30"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="px-4 py-3 bg-white/10 rounded-lg text-white">
+                  {ACTIVITY_OPTIONS[profile?.preference2 || 0]?.label}
+                </div>
+              )}
+            </div>
+
+            {/* Personality Type */}
+            <div>
+              <label className="block text-white/70 font-medium mb-2">
+                Personality Type
+              </label>
+              {isEditing ? (
+                <div className="flex gap-2">
+                  {PERSONALITY_OPTIONS.map(opt => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setEditedProfile(prev => prev ? {...prev, preference3: opt.value} : null)}
+                      className={`flex-1 px-4 py-3 rounded-lg ${
+                        editedProfile?.preference3 === opt.value
+                          ? "bg-orange-500 text-white"
+                          : "bg-white/20 text-white/80 hover:bg-white/30"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="px-4 py-3 bg-white/10 rounded-lg text-white">
+                  {PERSONALITY_OPTIONS[profile?.preference3 || 0]?.label}
+                </div>
+              )}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-4 pt-4">
+              {isEditing ? (
+                <>
+                  <button
+                    onClick={handleUpdateProfile}
+                    disabled={isUpdating}
+                    className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-semibold py-3 px-6 rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isUpdating ? (
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                        <span>Updating...</span>
+                      </div>
+                    ) : (
+                      "💾 Save Changes"
+                    )}
+                  </button>
+                  <button
+                    onClick={handleCancelEdit}
+                    disabled={isUpdating}
+                    className="flex-1 bg-white/20 text-white font-semibold py-3 px-6 rounded-lg hover:bg-white/30 transition-all duration-200 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={handleStartEdit}
+                    className="flex-1 bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold py-3 px-6 rounded-lg hover:from-pink-600 hover:to-purple-700 transition-all duration-200"
+                  >
+                    ✏️ Edit Profile
+                  </button>
+                  <button
+                    onClick={handleDecryptProfile}
+                    className="flex-1 bg-white/20 text-white font-semibold py-3 px-6 rounded-lg hover:bg-white/30 transition-all duration-200"
+                  >
+                    🔄 Refresh
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+      <ToastContainer position="top-right" theme="dark" />
+    </>
   );
 }
