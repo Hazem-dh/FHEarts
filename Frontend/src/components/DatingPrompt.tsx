@@ -3,7 +3,7 @@ export function DatingPrompt() {
     <div className="max-w-2xl mx-auto text-center">
       <div className="mb-12">
         <h1 className="text-6xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-white via-pink-100 to-red-100 bg-clip-text text-transparent">
-          SecretSwipe
+          FHEarts
         </h1>
 
         <p className="text-xl md:text-2xl text-pink-100 mb-8 font-light">
