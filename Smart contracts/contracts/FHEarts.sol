@@ -106,6 +106,7 @@ contract FHEarts is SepoliaConfig, Ownable {
         FHE.allowThis(preference2_);
         FHE.allowThis(preference3_);
         FHE.allowThis(countryCode_);
+        FHE.allow(countryCode_,msg.sender);
         FHE.allow(leadingZero_,msg.sender);
         FHE.allow(encryptedPhoneNumber_,msg.sender);
         FHE.allow(age_,msg.sender);
@@ -332,6 +333,17 @@ contract FHEarts is SepoliaConfig, Ownable {
         FHE.allowThis(preference1_);
         FHE.allowThis(preference2_);
         FHE.allowThis(preference3_);
+        FHE.allowThis(countryCode_);
+        FHE.allow(countryCode_,msg.sender);
+        FHE.allow(leadingZero_,msg.sender);
+        FHE.allow(encryptedPhoneNumber_,msg.sender);
+        FHE.allow(age_,msg.sender);
+        FHE.allow(location_,msg.sender);
+        FHE.allow(gender_,msg.sender);
+        FHE.allow(interestedIn_,msg.sender);
+        FHE.allow(preference1_,msg.sender);
+        FHE.allow(preference2_,msg.sender);
+        FHE.allow(preference3_,msg.sender);
 
         // Update user profile
         UserProfile storage profile = profiles[msg.sender];
@@ -437,23 +449,23 @@ contract FHEarts is SepoliaConfig, Ownable {
         return result;
     }
     
-    /**
- * @notice Get user's own encrypted profile data for frontend decryption
- * @return userAddress The address of the user
- * @return countryCode Encrypted country code
- * @return leadingZero Encrypted leading zero indicator
- * @return encryptedPhoneNumber Encrypted phone number
- * @return age Encrypted age
- * @return location Encrypted location
- * @return gender Encrypted gender
- * @return interestedIn Encrypted interest preference
- * @return preference1 Encrypted preference 1
- * @return preference2 Encrypted preference 2
- * @return preference3 Encrypted preference 3
- * @return isActive Whether the profile is active
+/**
+ * @notice Retrieves the encrypted profile data of a given user for frontend decryption.
+ * @param userAddress The address of the user whose profile is being requested.
+ * @return countryCode Encrypted country code of the user.
+ * @return leadingZero Encrypted indicator for a leading zero in the phone number.
+ * @return encryptedPhoneNumber Encrypted phone number of the user.
+ * @return age Encrypted age of the user.
+ * @return location Encrypted location of the user.
+ * @return gender Encrypted gender of the user.
+ * @return interestedIn Encrypted interest preference of the user.
+ * @return preference1 Encrypted first preference field.
+ * @return preference2 Encrypted second preference field.
+ * @return preference3 Encrypted third preference field.
+ * @return isActive Boolean flag indicating whether the profile is currently active.
  */
-function getMyProfile() external view onlyRegistered returns (
-    address userAddress,
+function getProfile(address userAddress) external view  returns (
+    
     euint8 countryCode,
     euint8 leadingZero,
     euint64 encryptedPhoneNumber,
@@ -465,11 +477,11 @@ function getMyProfile() external view onlyRegistered returns (
     euint8 preference2,
     euint8 preference3,
     bool isActive
+    
 ) {
-    UserProfile storage profile = profiles[msg.sender];
+    UserProfile storage profile = profiles[userAddress];
     
     return (
-        profile.userAddress,
         profile.countryCode,
         profile.leadingZero,
         profile.encryptedPhoneNumber,
@@ -481,6 +493,7 @@ function getMyProfile() external view onlyRegistered returns (
         profile.preference2,
         profile.preference3,
         profile.isActive
+        
     );
 }
 

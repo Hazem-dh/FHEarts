@@ -170,14 +170,15 @@ export const ABI =
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "getMyProfile",
-    "outputs": [
+    "inputs": [
       {
         "internalType": "address",
         "name": "userAddress",
         "type": "address"
-      },
+      }
+    ],
+    "name": "getProfile",
+    "outputs": [
       {
         "internalType": "euint8",
         "name": "countryCode",
