@@ -184,10 +184,38 @@ export function HomePage() {
       throw new Error("FHE instance not available");
     }
 
-    console.log("Searching for matches with FHE instance:", instance);
+    if (!address) {
+      throw new Error("Wallet not connected");
+    }
 
-    // Mock delay to simulate blockchain transaction
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    console.log("Searching for matches with FHE instance:", instance);
+    toast.info("🔍 Initiating search for compatible matches...");
+
+    try {
+      // Prepare transaction using ethers
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const contract = new ethers.Contract(contract_address, ABI, signer);
+
+      console.log("Calling searchMatches function on contract...");
+
+      // Call the searchMatches function on the smart contract
+      // Adjust the function name based on your actual contract function
+      const tx = await contract.searchMatches();
+
+      console.log("Search transaction sent:", tx.hash);
+      toast.info("⛓️ Transaction submitted to blockchain...");
+
+      // Wait for confirmation
+      const receipt = await tx.wait();
+      console.log("Search transaction confirmed:", receipt.blockNumber);
+      console.log(
+        "Search completed successfully - results stored in contract variables"
+      );
+    } catch (error) {
+      console.error("Error executing search transaction:", error);
+      throw error;
+    }
   };
 
   const handleSearchMatches = async (): Promise<void> => {

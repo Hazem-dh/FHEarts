@@ -1,25 +1,99 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { usePublicClient, useAccount } from "wagmi";
+import { usePublicClient, useAccount, useWriteContract } from "wagmi";
 import { contract_address } from "../contract/addresses";
 import { ABI } from "../contract/ABI";
+import { useInstance } from "../hooks/useInstance";
+import { ethers } from "ethers";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { type Address } from "viem";
 
-interface Match {
+interface MatchData {
+  address: string;
+  hasMatch: boolean;
+  isMutual: boolean;
+  hasPhoneConsent: boolean;
+  phoneNumber?: string;
+  countryCode?: number;
+  leadingZero?: number;
+}
+
+interface PendingMatch {
   id: number;
   address: string;
+}
+
+interface ProfileData {
+  countryCode: string;
+  leadingZero: string;
+  encryptedPhoneNumber: string;
 }
 
 export function MatchesPage() {
   const [isRegistered, setIsRegistered] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [matches, setMatches] = useState<Match[]>([]);
-  const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
+  const [matchData, setMatchData] = useState<MatchData | null>(null);
+  const [pendingMatches, setPendingMatches] = useState<PendingMatch[]>([]);
+  const [isSearching, setIsSearching] = useState<boolean>(false);
+  const [isDecrypting, setIsDecrypting] = useState<boolean>(false);
 
   const navigate = useNavigate();
   const publicClient = usePublicClient();
   const { address } = useAccount();
+  const { writeContract } = useWriteContract();
+  const { instance } = useInstance();
+
+  const decryptCiphertext = async (
+    ciphertextHandle: string
+  ): Promise<string> => {
+    if (!instance || !address) {
+      throw new Error("Instance or address not available");
+    }
+
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const signer = await provider.getSigner();
+
+    const keypair = instance.generateKeypair();
+    const handleContractPairs = [
+      {
+        handle: ciphertextHandle,
+        contractAddress: contract_address,
+      },
+    ];
+    const startTimeStamp = Math.floor(Date.now() / 1000).toString();
+    const durationDays = "10";
+    const contractAddresses = [contract_address];
+
+    const eip712 = instance.createEIP712(
+      keypair.publicKey,
+      contractAddresses,
+      startTimeStamp,
+      durationDays
+    );
+
+    const signature = await signer.signTypedData(
+      eip712.domain,
+      {
+        UserDecryptRequestVerification:
+          eip712.types.UserDecryptRequestVerification,
+      },
+      eip712.message
+    );
+
+    const result = await instance.userDecrypt(
+      handleContractPairs,
+      keypair.privateKey,
+      keypair.publicKey,
+      signature.replace("0x", ""),
+      contractAddresses,
+      signer.address,
+      startTimeStamp,
+      durationDays
+    );
+
+    return result[ciphertextHandle].toString();
+  };
 
   const checkRegistrationStatus = async (): Promise<boolean> => {
     try {
@@ -28,7 +102,7 @@ export function MatchesPage() {
       }
 
       const result = await publicClient.readContract({
-        address: contract_address,
+        address: contract_address as Address,
         abi: ABI,
         functionName: "isRegistered",
         args: [address],
@@ -40,66 +114,362 @@ export function MatchesPage() {
     }
   };
 
-  const fetchPendingMatches = async (): Promise<string[]> => {
+  const fetchMatchData = async (): Promise<MatchData | null> => {
+    try {
+      if (!publicClient || !address || !instance) {
+        return null;
+      }
+
+      // Check if user has a match
+      const hasMatch = await publicClient.readContract({
+        address: contract_address as Address,
+        abi: ABI,
+        functionName: "hasMatch",
+        args: [address],
+      });
+
+      if (!hasMatch) {
+        return {
+          address: "",
+          hasMatch: false,
+          isMutual: false,
+          hasPhoneConsent: false,
+        };
+      }
+
+      // Get best match details
+      const matchResult = (await publicClient.readContract({
+        address: contract_address as Address,
+        abi: ABI,
+        functionName: "getBestMatch",
+        args: [address],
+      })) as readonly [unknown, string, boolean];
+
+      const encryptedMatchIndex = matchResult[1];
+
+      // Decrypt match index to get matched user address
+      const decryptedIndex = await decryptCiphertext(encryptedMatchIndex);
+      const matchedUserAddress = (await publicClient.readContract({
+        address: contract_address as Address,
+        abi: ABI,
+        functionName: "IndexToAddress",
+        args: [decryptedIndex],
+      })) as Address;
+
+      // Check if it's mutual
+      const isMutual = await publicClient.readContract({
+        address: contract_address as Address,
+        abi: ABI,
+        functionName: "mutualMatches",
+        args: [matchedUserAddress, address],
+      });
+
+      // Check phone consent if mutual
+      let hasPhoneConsent = false;
+      if (isMutual) {
+        hasPhoneConsent = (await publicClient.readContract({
+          address: contract_address as Address,
+          abi: ABI,
+          functionName: "hasMutualPhoneConsent",
+          args: [address, matchedUserAddress],
+        })) as boolean;
+      }
+
+      return {
+        address: matchedUserAddress,
+        hasMatch: true,
+        isMutual: Boolean(isMutual),
+        hasPhoneConsent: Boolean(hasPhoneConsent),
+      };
+    } catch (error) {
+      console.error("Error fetching match data:", error);
+      return null;
+    }
+  };
+
+  const fetchPendingMatches = async (): Promise<PendingMatch[]> => {
     try {
       if (!publicClient || !address) {
         return [];
       }
 
-      const result = await publicClient.readContract({
-        address: contract_address,
+      const pendingAddresses = (await publicClient.readContract({
+        address: contract_address as Address,
         abi: ABI,
         functionName: "hasPendingMatches",
         args: [address],
-      });
-      return result as string[];
+      })) as readonly Address[];
+
+      return pendingAddresses.map((addr, index) => ({
+        id: index + 1,
+        address: addr,
+      }));
     } catch (error) {
       console.error("Error fetching pending matches:", error);
       return [];
     }
   };
 
-  useEffect(() => {
-    const initializePage = async (): Promise<void> => {
-      setIsLoading(true);
-      try {
-        if (!address) {
-          setIsRegistered(false);
-          setIsLoading(false);
-          return;
-        }
-
-        // Check registration status
-        const registered = await checkRegistrationStatus();
-        setIsRegistered(registered);
-
-        if (registered) {
-          // Fetch pending matches
-          const pendingAddresses = await fetchPendingMatches();
-
-          // Create simple match objects with just addresses
-          const matchObjects = pendingAddresses.map((addr, index) => ({
-            id: index + 1,
-            address: addr,
-          }));
-          setMatches(matchObjects);
-        }
-      } catch (error) {
-        console.error("Error initializing matches page:", error);
-        toast.error("Failed to load matches");
-      } finally {
-        setIsLoading(false);
+  const initializePage = async (): Promise<void> => {
+    setIsLoading(true);
+    try {
+      if (!address) {
+        setIsRegistered(false);
+        return;
       }
-    };
 
+      const registered = await checkRegistrationStatus();
+      setIsRegistered(registered);
+
+      if (registered) {
+        const [match, pending] = await Promise.all([
+          fetchMatchData(),
+          fetchPendingMatches(),
+        ]);
+
+        setMatchData(match);
+        setPendingMatches(pending);
+      }
+    } catch (error) {
+      console.error("Error initializing page:", error);
+      toast.error("Failed to load matches");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
     initializePage();
-  }, [address, publicClient]);
+  }, [address, publicClient, instance]);
+
+  const handleSearchMatches = async (): Promise<void> => {
+    if (!writeContract) {
+      toast.error("Write contract not available");
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const toastId = toast.loading("Searching for your best match...");
+
+      writeContract(
+        {
+          address: contract_address as Address,
+          abi: ABI,
+          functionName: "searchMatches",
+        },
+        {
+          onSuccess: () => {
+            toast.update(toastId, {
+              render: "Search complete!",
+              type: "success",
+              isLoading: false,
+              autoClose: 3000,
+            });
+            setTimeout(() => initializePage(), 2000);
+          },
+          onError: (error) => {
+            console.error("Search matches error:", error);
+            toast.update(toastId, {
+              render: "Search failed",
+              type: "error",
+              isLoading: false,
+              autoClose: 3000,
+            });
+          },
+        }
+      );
+    } catch (error) {
+      console.error("Error in handleSearchMatches:", error);
+      toast.error("Search failed");
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleGivePhoneConsent = async (): Promise<void> => {
+    if (!writeContract || !matchData?.address) {
+      toast.error("Write contract or match address not available");
+      return;
+    }
+
+    try {
+      const toastId = toast.loading("Giving phone consent...");
+
+      writeContract(
+        {
+          address: contract_address as Address,
+          abi: ABI,
+          functionName: "givePhoneConsent",
+          args: [matchData.address as Address],
+        },
+        {
+          onSuccess: () => {
+            toast.update(toastId, {
+              render: "Phone consent given!",
+              type: "success",
+              isLoading: false,
+              autoClose: 3000,
+            });
+            setTimeout(() => initializePage(), 2000);
+          },
+          onError: (error) => {
+            console.error("Give phone consent error:", error);
+            toast.update(toastId, {
+              render: "Failed to give consent",
+              type: "error",
+              isLoading: false,
+              autoClose: 3000,
+            });
+          },
+        }
+      );
+    } catch (error) {
+      console.error("Error in handleGivePhoneConsent:", error);
+      toast.error("Failed to give consent");
+    }
+  };
+
+  const handleDecryptPhone = async (): Promise<void> => {
+    if (!matchData?.address || !instance || !publicClient) {
+      toast.error("Missing required data for decryption");
+      return;
+    }
+
+    setIsDecrypting(true);
+    try {
+      const profile = (await publicClient.readContract({
+        address: contract_address as Address,
+        abi: ABI,
+        functionName: "getProfile",
+        args: [matchData.address as Address],
+      })) as ProfileData;
+
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+
+      const keypair = instance.generateKeypair();
+      const handleContractPairs = [
+        {
+          handle: profile.countryCode,
+          contractAddress: contract_address,
+        },
+        {
+          handle: profile.leadingZero,
+          contractAddress: contract_address,
+        },
+        {
+          handle: profile.encryptedPhoneNumber,
+          contractAddress: contract_address,
+        },
+      ];
+      const startTimeStamp = Math.floor(Date.now() / 1000).toString();
+      const durationDays = "10";
+      const contractAddresses = [contract_address];
+
+      const eip712 = instance.createEIP712(
+        keypair.publicKey,
+        contractAddresses,
+        startTimeStamp,
+        durationDays
+      );
+
+      const signature = await signer.signTypedData(
+        eip712.domain,
+        {
+          UserDecryptRequestVerification:
+            eip712.types.UserDecryptRequestVerification,
+        },
+        eip712.message
+      );
+
+      const result = await instance.userDecrypt(
+        handleContractPairs,
+        keypair.privateKey,
+        keypair.publicKey,
+        signature.replace("0x", ""),
+        contractAddresses,
+        signer.address,
+        startTimeStamp,
+        durationDays
+      );
+
+      const countryCode = result[profile.countryCode];
+      const leadingZero = result[profile.leadingZero];
+      const phoneNumber = result[profile.encryptedPhoneNumber];
+
+      setMatchData((prev) =>
+        prev
+          ? {
+              ...prev,
+              phoneNumber: phoneNumber.toString(),
+              countryCode: Number(countryCode),
+              leadingZero: Number(leadingZero),
+            }
+          : null
+      );
+
+      toast.success("Phone number decrypted!");
+    } catch (error) {
+      console.error("Error decrypting phone:", error);
+      toast.error("Failed to decrypt phone number");
+    } finally {
+      setIsDecrypting(false);
+    }
+  };
+
+  const handleRespondToMatch = async (
+    matchAddress: string,
+    accept: boolean
+  ): Promise<void> => {
+    if (!writeContract) {
+      toast.error("Write contract not available");
+      return;
+    }
+
+    try {
+      const toastId = toast.loading(
+        accept ? "Accepting match..." : "Declining match..."
+      );
+
+      writeContract(
+        {
+          address: contract_address as Address,
+          abi: ABI,
+          functionName: "respondToMatch",
+          args: [matchAddress as Address, accept],
+        },
+        {
+          onSuccess: () => {
+            toast.update(toastId, {
+              render: accept ? "Match accepted!" : "Match declined",
+              type: "success",
+              isLoading: false,
+              autoClose: 3000,
+            });
+            setTimeout(() => initializePage(), 2000);
+          },
+          onError: (error) => {
+            console.error("Respond to match error:", error);
+            toast.update(toastId, {
+              render: "Response failed",
+              type: "error",
+              isLoading: false,
+              autoClose: 3000,
+            });
+          },
+        }
+      );
+    } catch (error) {
+      console.error("Error in handleRespondToMatch:", error);
+      toast.error("Response failed");
+    }
+  };
 
   const handleGoToRegister = (): void => {
     navigate("/");
   };
 
-  // Show loading state
   if (isLoading) {
     return (
       <div className="w-full max-w-4xl mx-auto">
@@ -118,7 +488,6 @@ export function MatchesPage() {
     );
   }
 
-  // Show not registered state
   if (!isRegistered) {
     return (
       <>
@@ -137,7 +506,7 @@ export function MatchesPage() {
                 onClick={handleGoToRegister}
                 className="bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold py-4 px-8 rounded-lg hover:from-pink-600 hover:to-purple-700 transition-all duration-200 text-lg"
               >
-                📝 Go to Registration
+                Go to Registration
               </button>
             </div>
           </div>
@@ -158,117 +527,149 @@ export function MatchesPage() {
     <>
       <div className="w-full max-w-4xl mx-auto">
         <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl overflow-hidden">
-          {/* Header */}
           <div className="p-8 text-center border-b border-white/20">
-            <h1 className="text-3xl font-bold text-white mb-2">
-              💕 My Matches
-            </h1>
-            <p className="text-white/70">
-              {matches.length > 0
-                ? `${matches.length} people are interested in you!`
-                : "Connect with people who liked you back"}
-            </p>
+            <h1 className="text-3xl font-bold text-white mb-2">My Matches</h1>
+            <p className="text-white/70">Find your perfect connection</p>
           </div>
 
-          {/* Matches List */}
-          <div className="p-6">
-            {matches.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="text-6xl mb-4">💔</div>
-                <h3 className="text-xl font-semibold text-white mb-2">
-                  No pending matches
+          {/* Current Match Status */}
+          <div className="p-6 border-b border-white/20">
+            {!matchData?.hasMatch ? (
+              <div className="text-center">
+                <div className="text-4xl mb-4">💔</div>
+                <h3 className="text-xl font-semibold text-white mb-4">
+                  No Match Found
                 </h3>
-                <p className="text-white/70 mb-6">
-                  No one has matched with you yet. Keep your profile active!
-                </p>
                 <button
-                  onClick={() => navigate("/")}
-                  className="bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold py-3 px-6 rounded-lg hover:from-pink-600 hover:to-purple-700 transition-all duration-200"
+                  onClick={handleSearchMatches}
+                  disabled={isSearching || !instance}
+                  className="bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold py-3 px-6 rounded-lg hover:from-pink-600 hover:to-purple-700 transition-all duration-200 disabled:opacity-50"
                 >
-                  🔍 Find More Matches
+                  {isSearching ? "Searching..." : "Find New Match"}
                 </button>
               </div>
             ) : (
-              <div className="grid gap-4">
-                {matches.map((match) => (
-                  <div
-                    key={match.id}
-                    className="bg-white/10 rounded-xl p-6 hover:bg-white/15 transition-all duration-200 cursor-pointer border border-white/20"
-                    onClick={() => setSelectedMatch(match)}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-16 h-16 bg-gradient-to-r from-pink-400 to-purple-500 rounded-full flex items-center justify-center text-2xl">
-                        👤
-                      </div>
-
-                      <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-white mb-2">
-                          {match.address}
-                        </h3>
-                        <p className="text-white/60 text-sm">Wallet Address</p>
-                      </div>
-
-                      <div className="text-right">
-                        <div className="text-green-400 text-xs mb-1">
-                          💚 Interested
-                        </div>
-                        <div className="text-white/70 text-sm">
-                          Pending Match
-                        </div>
-                      </div>
+              <div className="bg-white/10 rounded-xl p-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 bg-gradient-to-r from-pink-400 to-purple-500 rounded-full flex items-center justify-center text-2xl">
+                    👤
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-white mb-2">
+                      Your Match
+                    </h3>
+                    <p className="text-white font-mono text-sm">
+                      {matchData.address}
+                    </p>
+                    <div className="flex gap-4 mt-2">
+                      <span
+                        className={`text-sm px-2 py-1 rounded ${
+                          matchData.isMutual
+                            ? "bg-green-500/20 text-green-400"
+                            : "bg-yellow-500/20 text-yellow-400"
+                        }`}
+                      >
+                        {matchData.isMutual
+                          ? "Mutual Match"
+                          : "Waiting for Response"}
+                      </span>
+                      {matchData.isMutual && (
+                        <span
+                          className={`text-sm px-2 py-1 rounded ${
+                            matchData.hasPhoneConsent
+                              ? "bg-blue-500/20 text-blue-400"
+                              : "bg-orange-500/20 text-orange-400"
+                          }`}
+                        >
+                          {matchData.hasPhoneConsent
+                            ? "Phone Shared"
+                            : "No Phone Consent"}
+                        </span>
+                      )}
                     </div>
                   </div>
-                ))}
+                  <div className="flex flex-col gap-2">
+                    {matchData.isMutual && !matchData.hasPhoneConsent && (
+                      <button
+                        onClick={handleGivePhoneConsent}
+                        className="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200"
+                      >
+                        Give Phone Consent
+                      </button>
+                    )}
+                    {matchData.hasPhoneConsent && !matchData.phoneNumber && (
+                      <button
+                        onClick={handleDecryptPhone}
+                        disabled={isDecrypting}
+                        className="bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 disabled:opacity-50"
+                      >
+                        {isDecrypting ? "Decrypting..." : "Get Phone Number"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {matchData.phoneNumber && (
+                  <div className="mt-4 bg-green-500/20 rounded-lg p-4">
+                    <h4 className="text-green-400 font-semibold mb-2">
+                      Contact Information:
+                    </h4>
+                    <p className="text-white">
+                      +{matchData.countryCode}
+                      {matchData.leadingZero === 1 ? "0" : ""}
+                      {matchData.phoneNumber}
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
 
-          {/* Match Details Modal */}
-          {selectedMatch && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 max-w-md w-full">
-                <div className="text-center mb-6">
-                  <div className="w-20 h-20 bg-gradient-to-r from-pink-400 to-purple-500 rounded-full mx-auto mb-4 flex items-center justify-center text-3xl">
-                    👤
+          {/* Pending Matches */}
+          {pendingMatches.length > 0 && (
+            <div className="p-6">
+              <h2 className="text-xl font-semibold text-white mb-4">
+                Pending Match Requests
+              </h2>
+              <div className="grid gap-4">
+                {pendingMatches.map((match) => (
+                  <div
+                    key={match.id}
+                    className="bg-white/10 rounded-xl p-6 border border-white/20"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-gradient-to-r from-pink-400 to-purple-500 rounded-full flex items-center justify-center">
+                        👤
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-white font-mono text-sm">
+                          {match.address}
+                        </p>
+                        <p className="text-white/60 text-sm">
+                          Wants to match with you
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() =>
+                            handleRespondToMatch(match.address, true)
+                          }
+                          className="bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200"
+                        >
+                          Accept
+                        </button>
+                        <button
+                          onClick={() =>
+                            handleRespondToMatch(match.address, false)
+                          }
+                          className="bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200"
+                        >
+                          Decline
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <h2 className="text-2xl font-bold text-white mb-4">
-                    Pending Match
-                  </h2>
-                  <div className="bg-white/10 rounded-lg p-4 mb-4">
-                    <p className="text-white/80 text-sm mb-1">
-                      Wallet Address:
-                    </p>
-                    <p className="text-white font-mono text-sm break-all">
-                      {selectedMatch.address}
-                    </p>
-                  </div>
-                  <p className="text-white/60 text-sm">
-                    This user has shown interest in your profile
-                  </p>
-                </div>
-
-                <div className="space-y-4">
-                  <button
-                    onClick={() => toast.info("Messaging feature coming soon!")}
-                    className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white font-semibold py-3 px-6 rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200"
-                  >
-                    💬 Send Message
-                  </button>
-                  <button
-                    onClick={() =>
-                      toast.info("Profile viewing feature coming soon!")
-                    }
-                    className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold py-3 px-6 rounded-lg hover:from-blue-600 hover:to-indigo-700 transition-all duration-200"
-                  >
-                    👀 View Full Profile
-                  </button>
-                  <button
-                    onClick={() => setSelectedMatch(null)}
-                    className="w-full bg-white/20 text-white font-semibold py-3 px-6 rounded-lg hover:bg-white/30 transition-all duration-200"
-                  >
-                    Close
-                  </button>
-                </div>
+                ))}
               </div>
             </div>
           )}

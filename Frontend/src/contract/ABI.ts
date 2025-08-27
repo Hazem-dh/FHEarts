@@ -50,19 +50,6 @@ export const ABI =
     "type": "event"
   },
   {
-    "inputs": [],
-    "name": "BATCH_SIZE",
-    "outputs": [
-      {
-        "internalType": "uint8",
-        "name": "",
-        "type": "uint8"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
     "inputs": [
       {
         "internalType": "uint64",
@@ -76,19 +63,6 @@ export const ABI =
         "internalType": "address",
         "name": "",
         "type": "address"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "MAX_MATCHES",
-    "outputs": [
-      {
-        "internalType": "uint8",
-        "name": "",
-        "type": "uint8"
       }
     ],
     "stateMutability": "view",
@@ -121,6 +95,13 @@ export const ABI =
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "clearMatch",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "uint64",
@@ -148,21 +129,21 @@ export const ABI =
         "type": "address"
       }
     ],
-    "name": "getMatchStatus",
+    "name": "getBestMatch",
     "outputs": [
       {
-        "internalType": "uint8",
-        "name": "matchCount",
-        "type": "uint8"
+        "internalType": "euint8",
+        "name": "score",
+        "type": "bytes32"
       },
       {
-        "internalType": "uint8",
-        "name": "currentBatch",
-        "type": "uint8"
+        "internalType": "euint64",
+        "name": "matchIndex",
+        "type": "bytes32"
       },
       {
         "internalType": "bool",
-        "name": "searchComplete",
+        "name": "isValid",
         "type": "bool"
       }
     ],
@@ -255,6 +236,25 @@ export const ABI =
     "inputs": [
       {
         "internalType": "address",
+        "name": "user",
+        "type": "address"
+      }
+    ],
+    "name": "hasMatch",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
         "name": "user1",
         "type": "address"
       },
@@ -326,45 +326,6 @@ export const ABI =
       {
         "internalType": "bool",
         "name": "",
-        "type": "bool"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "name": "matchStates",
-    "outputs": [
-      {
-        "internalType": "uint8",
-        "name": "currentBatch",
-        "type": "uint8"
-      },
-      {
-        "internalType": "uint8",
-        "name": "matchCount",
-        "type": "uint8"
-      },
-      {
-        "internalType": "euint8",
-        "name": "maxScore",
-        "type": "bytes32"
-      },
-      {
-        "internalType": "euint64",
-        "name": "maxScoreIndex",
-        "type": "bytes32"
-      },
-      {
-        "internalType": "bool",
-        "name": "searchComplete",
         "type": "bool"
       }
     ],
@@ -584,13 +545,6 @@ export const ABI =
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "resetMatchSearch",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
     "inputs": [
       {
         "internalType": "address",
@@ -716,14 +670,9 @@ export const ABI =
         "internalType": "address",
         "name": "",
         "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
       }
     ],
-    "name": "userMatches",
+    "name": "userBestMatch",
     "outputs": [
       {
         "internalType": "euint8",
