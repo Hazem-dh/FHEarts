@@ -6,8 +6,8 @@ import { usePublicClient, useAccount } from "wagmi";
 import { RegistrationFlow } from "../components/RegistrationFlow";
 import { useInstance } from "../hooks/useInstance";
 import { ethers } from "ethers";
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 interface RegistrationData {
   leadingZeros: number;
@@ -49,10 +49,9 @@ export function HomePage() {
         functionName: "isRegistered",
         args: [address],
       });
-
       return Boolean(result);
     } catch (error) {
-      console.error("Error calling isUserRegistered:", error);
+      console.error("Error checking registration status:", error);
       return false;
     }
   };
@@ -65,7 +64,7 @@ export function HomePage() {
         const status = await checkRegistrationStatus();
         setIsRegistered(status);
       } catch (error) {
-        console.error("Error checking registration status:", error);
+        console.error("Error fetching registration status:", error);
         setIsRegistered(false);
       } finally {
         setIsLoading(false);
@@ -84,108 +83,89 @@ export function HomePage() {
     setShowRegistration(true);
   };
 
+  const performRegistration = async (
+    formData: RegistrationData
+  ): Promise<void> => {
+    if (!instance) {
+      throw new Error("FHE instance not available");
+    }
+
+    if (!address) {
+      throw new Error("Wallet not connected");
+    }
+
+    console.log("Starting registration with FHE instance:", instance);
+    console.log("Registration data:", formData);
+    toast.info("🔒 Encrypting your data with FHE... This may take a moment...");
+
+    // Create encrypted input buffer
+    const buffer = instance.createEncryptedInput(contract_address, address);
+
+    // Add values to buffer
+    buffer.add8(BigInt(formData.leadingZeros));
+    buffer.add8(BigInt(formData.countryCode));
+    buffer.add64(BigInt(formData.phoneDigits));
+    buffer.add8(BigInt(formData.age));
+    buffer.add8(BigInt(formData.location));
+    buffer.add8(BigInt(formData.gender));
+    buffer.add8(BigInt(formData.interestedIn));
+    buffer.add8(BigInt(formData.preference1));
+    buffer.add8(BigInt(formData.preference2));
+    buffer.add8(BigInt(formData.preference3));
+
+    console.log("Encrypting data...");
+    const ciphertexts = await buffer.encrypt();
+    console.log("Ciphertexts generated:", ciphertexts);
+
+    // Prepare transaction
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const signer = await provider.getSigner();
+    const contract = new ethers.Contract(contract_address, ABI, signer);
+
+    // Send transaction
+    const tx = await contract.registerUser(
+      ciphertexts.handles[0], // leadingZeros
+      ciphertexts.handles[1], // countryCode
+      ciphertexts.handles[2], // phoneDigits
+      ciphertexts.handles[3], // age
+      ciphertexts.handles[4], // location
+      ciphertexts.handles[5], // gender
+      ciphertexts.handles[6], // interestedIn
+      ciphertexts.handles[7], // preference1
+      ciphertexts.handles[8], // preference2
+      ciphertexts.handles[9], // preference3
+      ciphertexts.inputProof // proof
+    );
+
+    console.log("Transaction sent:", tx.hash);
+
+    // Wait for confirmation
+    const receipt = await tx.wait();
+    console.log("Transaction confirmed:", receipt.blockNumber);
+  };
+
   const handleRegistrationComplete = async (
     formData: RegistrationData
   ): Promise<void> => {
     setIsRegistering(true);
-    
+
     try {
-      if (!instance) {
-        throw new Error("FHE instance not available");
-      }
-
-      if (!address) {
-        throw new Error("Wallet not connected");
-      }
-
-      console.log("Starting registration with FHE instance:", instance);
-      console.log("Registration data:", formData);
-
-      // Step 1: Create encrypted input buffer
-      toast.info("📦 Creating encrypted input buffer...");
-      
-      const buffer = instance.createEncryptedInput(
-        contract_address,
-        address
-      );
-
-      // Step 2: Add values to buffer
-      toast.info("🔐 Adding your data to encryption buffer...");
-      
-      buffer.add8(BigInt(formData.leadingZeros));
-      buffer.add8(BigInt(formData.countryCode));
-      buffer.add64(BigInt(formData.phoneDigits));
-      buffer.add8(BigInt(formData.age));
-      buffer.add8(BigInt(formData.location));
-      buffer.add8(BigInt(formData.gender));
-      buffer.add8(BigInt(formData.interestedIn));
-      buffer.add8(BigInt(formData.preference1));
-      buffer.add8(BigInt(formData.preference2));
-      buffer.add8(BigInt(formData.preference3));
-
-      // Step 3: Encrypt the data
-      toast.info("🔒 Encrypting your data with FHE... This may take a moment...");
-      
-      console.log("Encrypting data...");
-      const ciphertexts = await buffer.encrypt();
-      console.log("Ciphertexts generated:", ciphertexts);
-
-      // Step 4: Prepare transaction
-      toast.info("⛓️ Preparing blockchain transaction...");
-
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const signer = await provider.getSigner();
-      const contract = new ethers.Contract(
-        contract_address,
-        ABI,
-        signer
-      );
-
-      // Step 5: Send transaction
-      toast.warning("👛 Please confirm the transaction in your wallet...");
-
-      const tx = await contract.registerUser(
-        ciphertexts.handles[0], // leadingZeros
-        ciphertexts.handles[1], // countryCode
-        ciphertexts.handles[2], // phoneDigits
-        ciphertexts.handles[3], // age
-        ciphertexts.handles[4], // location
-        ciphertexts.handles[5], // gender
-        ciphertexts.handles[6], // interestedIn
-        ciphertexts.handles[7], // preference1
-        ciphertexts.handles[8], // preference2
-        ciphertexts.handles[9], // preference3
-        ciphertexts.inputProof   // proof
-      );
-
-      console.log("Transaction sent:", tx.hash);
-      toast.info(`📤 Transaction submitted! Hash: ${tx.hash.slice(0, 10)}...`);
-
-      // Step 6: Wait for confirmation
-      toast.info("⏳ Waiting for blockchain confirmation...");
-
-      const receipt = await tx.wait();
-      console.log("Transaction confirmed:", receipt.blockNumber);
-
-      // Success!
-      toast.success("🎉 Registration complete! Welcome to LoveChain!");
+      await toast.promise(performRegistration(formData), {
+        pending: "Registering your profile...",
+        success: "Registration complete! 🎉",
+        error: "Registration failed",
+      });
 
       // Update state
       setIsRegistered(true);
       setShowRegistration(false);
-      
+
       // Show additional success message
       setTimeout(() => {
-        toast.info("💕 You can now search for matches!");
+        toast.success("You can now search for matches! 💕");
       }, 1000);
-
     } catch (error) {
       console.error("Registration failed:", error);
-      
-      // Show error message
-      toast.error(`❌ Registration failed: ${
-        error instanceof Error ? error.message : "Unknown error"
-      }`);
     } finally {
       setIsRegistering(false);
     }
@@ -193,35 +173,38 @@ export function HomePage() {
 
   const handleRegistrationBack = (): void => {
     if (isRegistering) {
-      toast.warning("⚠️ Registration in progress, please wait...");
+      toast.warning("Registration in progress, please wait...");
       return;
     }
     setShowRegistration(false);
   };
 
+  const performSearch = async (): Promise<void> => {
+    if (!instance) {
+      throw new Error("FHE instance not available");
+    }
+
+    console.log("Searching for matches with FHE instance:", instance);
+
+    // Mock delay to simulate blockchain transaction
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  };
+
   const handleSearchMatches = async (): Promise<void> => {
     setIsSearching(true);
-    toast.info("🔍 Searching for your perfect matches...");
-    
+
     try {
-      if (!instance) {
-        throw new Error("FHE instance not available");
-      }
-
-      console.log("Searching for matches with FHE instance:", instance);
-
-      // Mock delay to simulate blockchain transaction
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      toast.success("✨ Matches found! Redirecting...");
+      await toast.promise(performSearch(), {
+        pending: "Searching for matches...",
+        success: "Matches found! ✨",
+        error: "Search failed",
+      });
 
       setTimeout(() => {
         navigate("/matches");
-      }, 2000);
-      
+      }, 1000);
     } catch (error) {
       console.error("Error searching for matches:", error);
-      toast.error("❌ Error searching for matches. Please try again.");
     } finally {
       setIsSearching(false);
     }
@@ -236,15 +219,11 @@ export function HomePage() {
           onBack={handleRegistrationBack}
           isSubmitting={isRegistering}
         />
-        <ToastContainer 
-          position="top-right"
-          autoClose={5000}
+        <ToastContainer
+          position="bottom-center"
+          autoClose={3000}
           hideProgressBar={false}
-          newestOnTop={true}
           closeOnClick
-          rtl={false}
-          pauseOnFocusLoss
-          draggable
           pauseOnHover
           theme="dark"
         />
@@ -307,7 +286,7 @@ export function HomePage() {
           <div className="text-center mb-8">
             <div className="text-6xl mb-4">💖</div>
             <h1 className="text-4xl font-bold text-white mb-2">
-              Welcome to LoveChain
+              Welcome to FHEarts
             </h1>
             <p className="text-white/70 text-lg">
               Decentralized dating powered by blockchain
@@ -353,8 +332,8 @@ export function HomePage() {
                   Profile Registered!
                 </h2>
                 <p className="text-white/80 mb-6">
-                  Your profile is registered on the blockchain. Ready to find your
-                  perfect match?
+                  Your profile is registered on the blockchain. Ready to find
+                  your perfect match?
                 </p>
                 <button
                   onClick={handleSearchMatches}
@@ -390,15 +369,11 @@ export function HomePage() {
           )}
         </div>
       </div>
-      <ToastContainer 
-        position="top-right"
-        autoClose={5000}
+      <ToastContainer
+        position="bottom-center"
+        autoClose={3000}
         hideProgressBar={false}
-        newestOnTop={true}
         closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
         pauseOnHover
         theme="dark"
       />
