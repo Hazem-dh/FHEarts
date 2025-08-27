@@ -22,7 +22,7 @@ export function Navbar() {
         <div className="flex items-center h-16">
           {/* Left: Logo/Brand */}
           <div className="flex items-center flex-shrink-0">
-            <span className="text-2xl font-bold text-white">💖 LoveChain</span>
+            <span className="text-2xl font-bold text-white">💖 FHEarts</span>
           </div>
 
           {/* Center: Navigation Links */}
