@@ -162,7 +162,7 @@ export function ProfilePage() {
 
   const decryptProfilePromise = async () => {
     if (!instance || !publicClient || !address) {
-      throw new Error("Please wait for encryption system to load");
+      throw new Error("Encryption system not ready");
     }
 
     // Get signer
@@ -228,8 +228,8 @@ export function ProfilePage() {
     );
     console.log("Decrypt result:", decryptResult);
     // Extract decrypted values
-    const countryCode = Number(decryptResult[result[0].toString()]);
-    const leadingZeros = Number(decryptResult[result[1].toString()]);
+    const countryCode = Number(decryptResult[result[1].toString()]);
+    const leadingZeros = Number(decryptResult[result[0].toString()]);
     const phoneDigits = Number(decryptResult[result[2].toString()]);
     const age = Number(decryptResult[result[3].toString()]);
     const location = Number(decryptResult[result[4].toString()]);
@@ -263,7 +263,7 @@ export function ProfilePage() {
 
   const handleDecryptProfile = async () => {
     if (!instance || !publicClient || !address) {
-      toast.error("Please wait for encryption system to load");
+      toast.error("Encryption system not ready");
       return;
     }
 
@@ -271,9 +271,9 @@ export function ProfilePage() {
 
     try {
       const decryptedProfile = await toast.promise(decryptProfilePromise(), {
-        pending: "🔐 Decrypting your profile...",
-        success: "✅ Profile decrypted successfully!",
-        error: "❌ Failed to decrypt profile. Please try again.",
+        pending: "🔐 Decrypting profile...",
+        success: "✅ Profile decrypted!",
+        error: "❌ Decryption failed",
       });
       console.log("Decrypted Profile:", decryptedProfile);
       setProfile(decryptedProfile);
@@ -373,9 +373,9 @@ export function ProfilePage() {
 
     try {
       const updatedProfile = await toast.promise(updateProfilePromise(), {
-        pending: "🔒 Updating your profile...",
-        success: "🎉 Profile updated successfully!",
-        error: "❌ Failed to update profile. Please try again.",
+        pending: "🔒 Updating profile...",
+        success: "🎉 Profile updated!",
+        error: "❌ Update failed",
       });
 
       setProfile(updatedProfile);
@@ -391,14 +391,12 @@ export function ProfilePage() {
   // Loading state
   if (isLoading || instanceLoading) {
     return (
-      <div className="w-full max-w-2xl mx-auto">
-        <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl p-8">
+      <div className="w-full max-w-lg mx-auto mt-16 px-4">
+        <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl p-6">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
             <h2 className="text-2xl font-bold text-white mb-2">
-              {instanceLoading
-                ? "Initializing encryption..."
-                : "Checking registration..."}
+              {instanceLoading ? "Loading ZAMA..." : "Loading Profile..."}
             </h2>
           </div>
         </div>
@@ -411,22 +409,21 @@ export function ProfilePage() {
   if (!isRegistered) {
     return (
       <>
-        <div className="w-full max-w-2xl mx-auto">
-          <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl p-8">
+        <div className="w-full max-w-lg mx-auto mt-16 px-4">
+          <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl p-6">
             <div className="text-center">
-              <div className="text-6xl mb-4">🚫</div>
-              <h2 className="text-3xl font-bold text-white mb-4">
+              <div className="text-4xl mb-4">🚫</div>
+              <h2 className="text-2xl font-bold text-white mb-4">
                 Profile Not Found
               </h2>
               <p className="text-white/70 mb-6">
-                You haven't registered on FHEarts yet. Create your profile to
-                start finding matches!
+                You need to register on FHEarts first.
               </p>
               <button
                 onClick={() => navigate("/")}
-                className="bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold py-3 px-8 rounded-lg hover:from-pink-600 hover:to-purple-700 transition-all duration-200"
+                className="bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold py-3 px-6 rounded-lg hover:from-pink-600 hover:to-purple-700 transition-all duration-200"
               >
-                Register Now →
+                Register Now
               </button>
             </div>
           </div>
@@ -440,36 +437,36 @@ export function ProfilePage() {
   if (!hasDecrypted) {
     return (
       <>
-        <div className="w-full max-w-2xl mx-auto">
-          <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl p-8">
+        <div className="w-full max-w-lg mx-auto mt-64 px-4">
+          <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl p-6">
             <div className="text-center">
-              <div className="w-24 h-24 bg-gradient-to-r from-pink-400 to-purple-500 rounded-full mx-auto mb-6 flex items-center justify-center">
-                <span className="text-4xl">🔒</span>
+              <div className="w-20 h-20 bg-gradient-to-r from-pink-400 to-purple-500 rounded-full mx-auto mb-6 flex items-center justify-center">
+                <span className="text-3xl">🔒</span>
               </div>
-              <h2 className="text-3xl font-bold text-white mb-4">
-                Your Encrypted Profile
+              <h2 className="text-2xl font-bold text-white mb-4">
+                Encrypted Profile
               </h2>
-              <p className="text-white/70 mb-8">
-                Your profile data is securely encrypted on the blockchain. Click
-                below to decrypt and view your information.
+              <p className="text-white/70 mb-8 text-sm">
+                Your profile is encrypted on the blockchain. 
+                Decrypt it to view and edit your information.
               </p>
               <button
                 onClick={handleDecryptProfile}
                 disabled={isDecrypting || !instance}
-                className="bg-gradient-to-r from-green-500 to-emerald-600 text-white font-semibold py-4 px-10 rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-gradient-to-r from-green-500 to-emerald-600 text-white font-semibold py-3 px-6 rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isDecrypting ? (
                   <div className="flex items-center justify-center gap-2">
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                     <span>Decrypting...</span>
                   </div>
                 ) : (
-                  <>🔓 Decrypt My Profile</>
+                  "🔓 Decrypt Profile"
                 )}
               </button>
               {!instance && (
-                <p className="text-yellow-400 text-sm mt-4">
-                  Waiting for encryption system...
+                <p className="text-yellow-400 text-xs mt-3">
+                  Loading encryption system...
                 </p>
               )}
             </div>
@@ -483,41 +480,37 @@ export function ProfilePage() {
   // Decrypted profile display
   return (
     <>
-      <div className="w-full max-w-2xl mx-auto">
-        <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl p-8">
-          <div className="text-center mb-8">
-            <div className="w-24 h-24 bg-gradient-to-r from-pink-400 to-purple-500 rounded-full mx-auto mb-4 flex items-center justify-center">
-              <span className="text-3xl">👤</span>
-            </div>
-            <h1 className="text-3xl font-bold text-white mb-2">My Profile</h1>
-            <p className="text-white/70">
-              {isEditing ? "Edit your profile" : "Your decrypted profile data"}
+      <div className="w-full max-w-lg mx-auto mt-64 px-4">
+        <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl p-5">
+          <div className="text-center mb-6">
+
+            <h1 className="text-2xl font-bold text-white mb-1">My Profile</h1>
+            <p className="text-white/70 text-sm">
+              {isEditing ? "Edit your information" : "Your decrypted profile"}
             </p>
           </div>
 
-          <div className="space-y-6">
+          <div className="space-y-4">
             {/* Phone Number */}
             <div>
-              <label className="block text-white/70 font-medium mb-2">
+              <label className="block text-white/70 font-medium mb-2 text-sm">
                 Phone Number
               </label>
               {isEditing ? (
                 <div className="flex items-center gap-2">
-                  <div className="bg-white/10 border border-white/30 rounded-lg px-3 py-3 text-white">
-                    +
-                    {LOCATION_TO_COUNTRY_CODE[editedProfile?.location || 0] ||
-                      33}
+                  <div className="bg-white/10 border border-white/30 rounded-lg px-3 py-2 text-white text-sm">
+                    +{LOCATION_TO_COUNTRY_CODE[editedProfile?.location || 0] || 33}
                   </div>
                   <input
                     type="tel"
                     value={phoneInput}
                     onChange={(e) => setPhoneInput(e.target.value)}
-                    className="flex-1 px-4 py-3 bg-white/10 border border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:border-pink-400 focus:ring-2 focus:ring-pink-400/20"
+                    className="flex-1 px-3 py-2 bg-white/10 border border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:border-pink-400 focus:ring-2 focus:ring-pink-400/20 text-sm"
                     placeholder="0123456789"
                   />
                 </div>
               ) : (
-                <div className="px-4 py-3 bg-white/10 rounded-lg text-white">
+                <div className="px-3 py-2 bg-white/10 rounded-lg text-white text-sm">
                   +{profile?.countryCode} {profile?.phoneNumber}
                 </div>
               )}
@@ -525,7 +518,7 @@ export function ProfilePage() {
 
             {/* Age */}
             <div>
-              <label className="block text-white/70 font-medium mb-2">
+              <label className="block text-white/70 font-medium mb-2 text-sm">
                 Age
               </label>
               {isEditing ? (
@@ -541,10 +534,10 @@ export function ProfilePage() {
                   }
                   min="18"
                   max="100"
-                  className="w-full px-4 py-3 bg-white/10 border border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:border-pink-400 focus:ring-2 focus:ring-pink-400/20"
+                  className="w-full px-3 py-2 bg-white/10 border border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:border-pink-400 focus:ring-2 focus:ring-pink-400/20 text-sm"
                 />
               ) : (
-                <div className="px-4 py-3 bg-white/10 rounded-lg text-white">
+                <div className="px-3 py-2 bg-white/10 rounded-lg text-white text-sm">
                   {profile?.age}
                 </div>
               )}
@@ -552,7 +545,7 @@ export function ProfilePage() {
 
             {/* Location */}
             <div>
-              <label className="block text-white/70 font-medium mb-2">
+              <label className="block text-white/70 font-medium mb-2 text-sm">
                 Location
               </label>
               {isEditing ? (
@@ -565,7 +558,7 @@ export function ProfilePage() {
                         : null
                     )
                   }
-                  className="w-full px-4 py-3 bg-white/10 border border-white/30 rounded-lg text-white focus:outline-none focus:border-pink-400"
+                  className="w-full px-3 py-2 bg-white/10 border border-white/30 rounded-lg text-white focus:outline-none focus:border-pink-400 text-sm"
                 >
                   {LOCATION_OPTIONS.map((opt) => (
                     <option
@@ -578,7 +571,7 @@ export function ProfilePage() {
                   ))}
                 </select>
               ) : (
-                <div className="px-4 py-3 bg-white/10 rounded-lg text-white">
+                <div className="px-3 py-2 bg-white/10 rounded-lg text-white text-sm">
                   {LOCATION_OPTIONS[profile?.location || 0]?.label}
                 </div>
               )}
@@ -586,7 +579,7 @@ export function ProfilePage() {
 
             {/* Gender */}
             <div>
-              <label className="block text-white/70 font-medium mb-2">
+              <label className="block text-white/70 font-medium mb-2 text-sm">
                 Gender
               </label>
               {isEditing ? (
@@ -599,7 +592,7 @@ export function ProfilePage() {
                           prev ? { ...prev, gender: opt.value } : null
                         )
                       }
-                      className={`px-3 py-2 rounded-lg ${
+                      className={`px-3 py-2 rounded-lg text-sm ${
                         editedProfile?.gender === opt.value
                           ? "bg-pink-500 text-white"
                           : "bg-white/20 text-white/80 hover:bg-white/30"
@@ -610,7 +603,7 @@ export function ProfilePage() {
                   ))}
                 </div>
               ) : (
-                <div className="px-4 py-3 bg-white/10 rounded-lg text-white">
+                <div className="px-3 py-2 bg-white/10 rounded-lg text-white text-sm">
                   {GENDER_OPTIONS[profile?.gender || 0]?.label}
                 </div>
               )}
@@ -618,7 +611,7 @@ export function ProfilePage() {
 
             {/* Interested In */}
             <div>
-              <label className="block text-white/70 font-medium mb-2">
+              <label className="block text-white/70 font-medium mb-2 text-sm">
                 Interested In
               </label>
               {isEditing ? (
@@ -631,7 +624,7 @@ export function ProfilePage() {
                           prev ? { ...prev, interestedIn: opt.value } : null
                         )
                       }
-                      className={`px-3 py-2 rounded-lg ${
+                      className={`px-3 py-2 rounded-lg text-sm ${
                         editedProfile?.interestedIn === opt.value
                           ? "bg-purple-500 text-white"
                           : "bg-white/20 text-white/80 hover:bg-white/30"
@@ -642,7 +635,7 @@ export function ProfilePage() {
                   ))}
                 </div>
               ) : (
-                <div className="px-4 py-3 bg-white/10 rounded-lg text-white">
+                <div className="px-3 py-2 bg-white/10 rounded-lg text-white text-sm">
                   {INTERESTED_IN_OPTIONS[profile?.interestedIn || 0]?.label}
                 </div>
               )}
@@ -650,8 +643,8 @@ export function ProfilePage() {
 
             {/* Movie Preference */}
             <div>
-              <label className="block text-white/70 font-medium mb-2">
-                Favorite Movie Genre
+              <label className="block text-white/70 font-medium mb-2 text-sm">
+                Movie Genre
               </label>
               {isEditing ? (
                 <div className="grid grid-cols-2 gap-2">
@@ -663,7 +656,7 @@ export function ProfilePage() {
                           prev ? { ...prev, preference1: opt.value } : null
                         )
                       }
-                      className={`px-3 py-2 rounded-lg text-sm ${
+                      className={`px-2 py-2 rounded-lg text-xs ${
                         editedProfile?.preference1 === opt.value
                           ? "bg-indigo-500 text-white"
                           : "bg-white/20 text-white/80 hover:bg-white/30"
@@ -674,7 +667,7 @@ export function ProfilePage() {
                   ))}
                 </div>
               ) : (
-                <div className="px-4 py-3 bg-white/10 rounded-lg text-white">
+                <div className="px-3 py-2 bg-white/10 rounded-lg text-white text-sm">
                   {MOVIE_OPTIONS[profile?.preference1 || 0]?.label}
                 </div>
               )}
@@ -682,8 +675,8 @@ export function ProfilePage() {
 
             {/* Activity Preference */}
             <div>
-              <label className="block text-white/70 font-medium mb-2">
-                Favorite Activity
+              <label className="block text-white/70 font-medium mb-2 text-sm">
+                Activity
               </label>
               {isEditing ? (
                 <div className="grid grid-cols-2 gap-2">
@@ -695,7 +688,7 @@ export function ProfilePage() {
                           prev ? { ...prev, preference2: opt.value } : null
                         )
                       }
-                      className={`px-3 py-2 rounded-lg text-sm ${
+                      className={`px-2 py-2 rounded-lg text-xs ${
                         editedProfile?.preference2 === opt.value
                           ? "bg-green-500 text-white"
                           : "bg-white/20 text-white/80 hover:bg-white/30"
@@ -706,7 +699,7 @@ export function ProfilePage() {
                   ))}
                 </div>
               ) : (
-                <div className="px-4 py-3 bg-white/10 rounded-lg text-white">
+                <div className="px-3 py-2 bg-white/10 rounded-lg text-white text-sm">
                   {ACTIVITY_OPTIONS[profile?.preference2 || 0]?.label}
                 </div>
               )}
@@ -714,8 +707,8 @@ export function ProfilePage() {
 
             {/* Personality Type */}
             <div>
-              <label className="block text-white/70 font-medium mb-2">
-                Personality Type
+              <label className="block text-white/70 font-medium mb-2 text-sm">
+                Personality
               </label>
               {isEditing ? (
                 <div className="flex gap-2">
@@ -727,7 +720,7 @@ export function ProfilePage() {
                           prev ? { ...prev, preference3: opt.value } : null
                         )
                       }
-                      className={`flex-1 px-4 py-3 rounded-lg ${
+                      className={`flex-1 px-3 py-2 rounded-lg text-sm ${
                         editedProfile?.preference3 === opt.value
                           ? "bg-orange-500 text-white"
                           : "bg-white/20 text-white/80 hover:bg-white/30"
@@ -738,34 +731,34 @@ export function ProfilePage() {
                   ))}
                 </div>
               ) : (
-                <div className="px-4 py-3 bg-white/10 rounded-lg text-white">
+                <div className="px-3 py-2 bg-white/10 rounded-lg text-white text-sm">
                   {PERSONALITY_OPTIONS[profile?.preference3 || 0]?.label}
                 </div>
               )}
             </div>
 
             {/* Action Buttons */}
-            <div className="flex gap-4 pt-4">
+            <div className="flex gap-3 pt-4">
               {isEditing ? (
                 <>
                   <button
                     onClick={handleUpdateProfile}
                     disabled={isUpdating}
-                    className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-semibold py-3 px-6 rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-semibold py-2 px-4 rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                   >
                     {isUpdating ? (
                       <div className="flex items-center justify-center gap-2">
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                        <span>Updating...</span>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        <span>Saving...</span>
                       </div>
                     ) : (
-                      "💾 Save Changes"
+                      "💾 Save"
                     )}
                   </button>
                   <button
                     onClick={handleCancelEdit}
                     disabled={isUpdating}
-                    className="flex-1 bg-white/20 text-white font-semibold py-3 px-6 rounded-lg hover:bg-white/30 transition-all duration-200 disabled:opacity-50"
+                    className="flex-1 bg-white/20 text-white font-semibold py-2 px-4 rounded-lg hover:bg-white/30 transition-all duration-200 disabled:opacity-50 text-sm"
                   >
                     Cancel
                   </button>
@@ -774,13 +767,13 @@ export function ProfilePage() {
                 <>
                   <button
                     onClick={handleStartEdit}
-                    className="flex-1 bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold py-3 px-6 rounded-lg hover:from-pink-600 hover:to-purple-700 transition-all duration-200"
+                    className="flex-1 bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold py-2 px-4 rounded-lg hover:from-pink-600 hover:to-purple-700 transition-all duration-200 text-sm"
                   >
-                    ✏️ Edit Profile
+                    ✏️ Edit
                   </button>
                   <button
                     onClick={handleDecryptProfile}
-                    className="flex-1 bg-white/20 text-white font-semibold py-3 px-6 rounded-lg hover:bg-white/30 transition-all duration-200"
+                    className="flex-1 bg-white/20 text-white font-semibold py-2 px-4 rounded-lg hover:bg-white/30 transition-all duration-200 text-sm"
                   >
                     🔄 Refresh
                   </button>
