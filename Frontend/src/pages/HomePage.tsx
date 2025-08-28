@@ -141,7 +141,10 @@ export function HomePage() {
 
     // Wait for confirmation
     const receipt = await tx.wait();
-    console.log("Profile registration confirmed on blockchain:", receipt.blockNumber);
+    console.log(
+      "Profile registration confirmed on blockchain:",
+      receipt.blockNumber
+    );
   };
 
   const handleRegistrationComplete = async (
@@ -264,8 +267,8 @@ export function HomePage() {
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500 mx-auto mb-4"></div>
             <h2 className="text-2xl font-bold text-white mb-2">
               {instanceLoading
-                ? "🔐 Initializing ZAMA FHE..."
-                : "💕 Loading FHEarts..."}
+                ? " Initializing ZAMA FHE..."
+                : " Loading FHEarts..."}
             </h2>
             <p className="text-white/70">
               {instanceLoading
@@ -326,15 +329,16 @@ export function HomePage() {
                   🛡️ Fully Private Matching
                 </h2>
                 <p className="text-white/80 mb-6 text-sm leading-relaxed">
-                  Your data is encrypted before reaching the blockchain. Smart contracts 
-                  calculate compatibility scores on encrypted data to find your perfect match.
+                  Your data is encrypted before reaching the blockchain. Smart
+                  contracts calculate compatibility scores on encrypted data to
+                  find your perfect match.
                 </p>
                 <button
                   onClick={handleRegister}
                   disabled={!instance}
                   className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold py-3 px-6 rounded-xl hover:from-pink-600 hover:to-purple-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
                 >
-                  💕 Create Encrypted Profile
+                  Create Encrypted Profile
                 </button>
                 {!instance && (
                   <p className="text-yellow-400 text-xs mt-2">
@@ -346,27 +350,33 @@ export function HomePage() {
               <div className="grid grid-cols-3 gap-3 text-center">
                 <div className="bg-white/5 rounded-lg p-3 border border-green-400/20">
                   <div className="text-xl mb-1">🔐</div>
-                  <p className="text-green-300 font-medium text-xs">Encrypted</p>
+                  <p className="text-green-300 font-medium text-xs">
+                    Encrypted
+                  </p>
                 </div>
                 <div className="bg-white/5 rounded-lg p-3 border border-blue-400/20">
                   <div className="text-xl mb-1">🧮</div>
-                  <p className="text-blue-300 font-medium text-xs">Smart Match</p>
+                  <p className="text-blue-300 font-medium text-xs">
+                    Smart Match
+                  </p>
                 </div>
                 <div className="bg-white/5 rounded-lg p-3 border border-purple-400/20">
                   <div className="text-xl mb-1">🎯</div>
-                  <p className="text-purple-300 font-medium text-xs">Best Match</p>
+                  <p className="text-purple-300 font-medium text-xs">
+                    Best Match
+                  </p>
                 </div>
               </div>
             </div>
           ) : (
             <div className="text-center space-y-6">
               <div className="bg-gradient-to-br from-green-500/20 to-emerald-600/20 rounded-xl p-6 border border-green-400/30">
-                <div className="text-3xl mb-2">🔐✅</div>
+                <div className="text-3xl mb-2">🔐</div>
                 <h2 className="text-xl font-semibold text-white mb-3">
                   Profile Encrypted!
                 </h2>
                 <p className="text-white/80 mb-6 text-sm leading-relaxed">
-                  Your profile is secured with FHE encryption. Ready to find 
+                  Your profile is secured with FHE encryption. Ready to find
                   your perfect match through private compatibility calculations?
                 </p>
                 <button
@@ -402,8 +412,9 @@ export function HomePage() {
 
               <div className="bg-purple-500/10 rounded-lg p-3 border border-purple-400/20">
                 <p className="text-purple-200 text-xs">
-                  🔒 <strong>Privacy Guaranteed:</strong> Matches calculated on encrypted data. 
-                  Personal information remains completely private.
+                  🔒 <strong>Privacy Guaranteed:</strong> Matches calculated on
+                  encrypted data. Personal information remains completely
+                  private.
                 </p>
               </div>
             </div>

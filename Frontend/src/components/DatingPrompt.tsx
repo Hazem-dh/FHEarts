@@ -11,10 +11,13 @@ export function DatingPrompt() {
         </p>
 
         <div className="text-gray-300 space-y-4 mb-12">
-          <p className="text-lg">🔒 Your preferences stay fully encrypted</p>
-          <p className="text-lg">💘 Matches only reveal if both swipe right</p>
+          <p className="text-lg"> Your preferences stay fully encrypted</p>
           <p className="text-lg">
-            📱 Phone numbers stay hidden until you allow reveal
+            {" "}
+            Matches only reveal if both accept to match
+          </p>
+          <p className="text-lg">
+            Phone numbers stay hidden until you allow reveal by giving consent
           </p>
         </div>
       </div>
