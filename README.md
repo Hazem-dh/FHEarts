@@ -1,6 +1,18 @@
 # FHEarts
 
 A privacy-first dating app using Fully Homomorphic Encryption (FHE) powered by ZAMA technology.
+## Screenshots
+
+<p align="center">
+<img width="500" height="500" alt="Screenshot 3" src="https://github.com/user-attachments/assets/ddb70140-d1fd-4764-a37f-74dee59ee067" />
+<p/>   
+<p align="center">
+   <img width="500" height="500" alt="Screenshot from 2025-08-28 10-20-06" src="https://github.com/user-attachments/assets/95f1386b-8fce-46f9-be24-138bf0e24f32" />
+<p/>
+   <p align="center">
+   <img width="500" height="500" alt="Screenshot 2" src="https://github.com/user-attachments/assets/63811b16-d4f6-40c2-aefb-ef7cc5d092e3" />
+<p/>
+
 
 ## What it does
 
@@ -13,11 +25,11 @@ Due to UX and scalability considerations, the app currently finds one best match
 - **Encrypted profiles**: All data encrypted client-side using ZAMA FHE
 - **Private matching**: Compatibility calculated on encrypted data
 - **Best match**: Finds your most compatible partner
-- **Blockchain storage**: Profiles stored securely on-chain
+- **Blockchain ecrypted storage**: Profiles stored securely and encrypted on-chain
 
 ## How it works
 
-1. User creates profile — data gets encrypted locally  
+1. User creates profile and data gets encrypted locally  
 2. Profile stored on blockchain in encrypted form  
 3. Smart contract calculates compatibility scores using FHE  
 4. Best match returned while keeping all data private  
@@ -34,19 +46,47 @@ Due to UX and scalability considerations, the app currently finds one best match
 
 ## Installation
 
+### Prerequisites
+- Node.js 
+- Alchemy API key
+- Etherscan API key
+- Ethereum wallet private key
+
+### Setup
+
+1. **Clone the repository**
 ```bash
-git clone https://github.com/yourusername/fhearts.git
+git clone https://github.com/Hazem-dh/FHEarts.git
 cd fhearts
-npm install
-npm run dev
 ```
- 
+2. **Smart Contracts Setup**
+```bash
+cd Smart\ contracts
+npm install
+```
+3.  **Create environment file**
+Create a .env file in the Smart contracts directory with your API keys:
+```bash
+ALCHEMY_API_KEY=your_alchemy_api_key_here
+ETHERSCAN_API_KEY=your_etherscan_api_key_here
+PRIVATE_KEY=your_wallet_private_key_here
+```
+ 4.  **Deploy Smart Contracts**
+```bash
+npx hardhat --network sepolia deploy
+```
+ 5.  **Frontend Setup**
+```bash
+cd frontend
+npm install
+./CopyCopySCMetadata
+```
 
 ## Planned Improvements
 
 - Multiple match options  
 - Enhanced preference system  
-- In-app messaging  
+- Better UX  
 - Encrypted strings (e.g., secure sharing of social media links once supported by ZAMA FHE)  
 
 ## Tech Stack
@@ -56,13 +96,17 @@ npm run dev
 - Ethereum smart contracts (Sepolia testnet)  
 - Wagmi for Web3 integration  
 
-## Broader Applications
+Broader Applications
 
 While FHEarts focuses on dating, the same architecture can be applied to other use cases:  
 
 - **Job matching**: Employers and candidates matched privately on skills and preferences  
 - **Mentorship platforms**: Secure pairing of mentors and mentees without revealing sensitive data upfront  
-- **Networking**: Privacy-preserving social or professional matchmaking  
+- **Networking**: Privacy-preserving social or professional matchmaking
+  
+## ⚠️Warning
+All features have been tested on the frontend, but the project is still experimental.
+There might be bugs or unexpected behavior.
 
 ## Contributing
 
