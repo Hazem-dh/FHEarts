@@ -26,12 +26,6 @@ interface PendingMatch {
   address: string;
 }
 
-interface ProfileData {
-  countryCode: string;
-  leadingZero: string;
-  encryptedPhoneNumber: string;
-}
-
 export function MatchesPage() {
   const [isRegistered, setIsRegistered] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -462,19 +456,61 @@ export function MatchesPage() {
   };
 
   const handleDecryptPhone = async (): Promise<void> => {
-    if (!matchData?.address || !instance || !publicClient) {
+    if (!matchData?.address || !instance || !publicClient || !address) {
       toast.error("Missing required data for decryption");
+      return;
+    }
+
+    // Double-check mutual phone consent before attempting decryption
+    try {
+      const mutualConsent = await publicClient.readContract({
+        address: contract_address as Address,
+        abi: ABI,
+        functionName: "hasMutualPhoneConsent",
+        args: [address, matchData.address as Address],
+      });
+
+      if (!mutualConsent) {
+        toast.error("Mutual phone consent required for decryption");
+        return;
+      }
+    } catch (error) {
+      console.error("Error checking mutual consent:", error);
+      toast.error("Failed to verify phone consent status");
       return;
     }
 
     setIsDecrypting(true);
     try {
-      const profile = (await publicClient.readContract({
+      // Get the profile data - returns tuple with all profile fields
+      const profileData = (await publicClient.readContract({
         address: contract_address as Address,
         abi: ABI,
         functionName: "getProfile",
         args: [matchData.address as Address],
-      })) as ProfileData;
+      })) as readonly [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        boolean
+      ];
+
+      // Extract the phone-related fields (first 3 fields based on contract)
+      const [countryCodeHandle, leadingZeroHandle, phoneNumberHandle] =
+        profileData;
+
+      console.log("Profile handles:", {
+        countryCode: countryCodeHandle,
+        leadingZero: leadingZeroHandle,
+        phoneNumber: phoneNumberHandle,
+      });
 
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
@@ -482,15 +518,15 @@ export function MatchesPage() {
       const keypair = instance.generateKeypair();
       const handleContractPairs = [
         {
-          handle: profile.countryCode,
+          handle: countryCodeHandle,
           contractAddress: contract_address,
         },
         {
-          handle: profile.leadingZero,
+          handle: leadingZeroHandle,
           contractAddress: contract_address,
         },
         {
-          handle: profile.encryptedPhoneNumber,
+          handle: phoneNumberHandle,
           contractAddress: contract_address,
         },
       ];
@@ -514,6 +550,8 @@ export function MatchesPage() {
         eip712.message
       );
 
+      console.log("Attempting decryption with handles:", handleContractPairs);
+
       const result = await instance.userDecrypt(
         handleContractPairs,
         keypair.privateKey,
@@ -525,9 +563,21 @@ export function MatchesPage() {
         durationDays
       );
 
-      const countryCode = result[profile.countryCode];
-      const leadingZero = result[profile.leadingZero];
-      const phoneNumber = result[profile.encryptedPhoneNumber];
+      console.log("Decryption result:", result);
+
+      const countryCode = result[countryCodeHandle];
+      const leadingZero = result[leadingZeroHandle];
+      const phoneNumber = result[phoneNumberHandle];
+
+      if (
+        countryCode === undefined ||
+        leadingZero === undefined ||
+        phoneNumber === undefined
+      ) {
+        throw new Error(
+          "Decryption returned undefined values - check FHE permissions"
+        );
+      }
 
       setMatchData((prev) =>
         prev
@@ -543,7 +593,26 @@ export function MatchesPage() {
       toast.success("Phone number decrypted!");
     } catch (error) {
       console.error("Error decrypting phone:", error);
-      toast.error("Failed to decrypt phone number");
+
+      // Type guard for error handling
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+
+      // More specific error messages
+      if (
+        errorMessage.includes("permission") ||
+        errorMessage.includes("unauthorized")
+      ) {
+        toast.error(
+          "Permission denied: Both users must give phone consent first"
+        );
+      } else if (errorMessage.includes("undefined")) {
+        toast.error(
+          "Decryption failed: Check if mutual phone consent is properly established"
+        );
+      } else {
+        toast.error(`Decryption failed: ${errorMessage || "Unknown error"}`);
+      }
     } finally {
       setIsDecrypting(false);
     }
