@@ -250,17 +250,25 @@ function searchMatches() external onlyRegistered {
         }
     }
     
-    /**
-     * @notice Respond to a match request (when someone matched with you)
-     */
-    function respondToMatch(address requester, bool accept) external onlyRegistered {
-        require(isRegistered[requester], "Requester not registered");
-        require(mutualMatches[requester][msg.sender], "No match request from this user");
+/**
+ * @notice Respond to a match request (when someone matched with you)
+ */
+function respondToMatch(address requester, bool accept) external onlyRegistered {
+    require(isRegistered[requester], "Requester not registered");
+    require(mutualMatches[requester][msg.sender], "No match request from this user");
+    
+    if (accept) {
+        // Accept the match - create mutual match
+        mutualMatches[msg.sender][requester] = true;
+    } else {
+        // Reject the match - clear the original match request
+        mutualMatches[requester][msg.sender] = false;
         
-        if (accept) {
-            mutualMatches[msg.sender][requester] = true;
-        }
+        // Also clear any existing phone consent from the requester
+        phoneConsent[requester][msg.sender] = false;
+        phoneConsent[msg.sender][requester] = false;
     }
+}
     
     /**
      * @notice Update user profile and reset match
