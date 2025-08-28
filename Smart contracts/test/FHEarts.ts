@@ -483,4 +483,335 @@ describe("FHEarts Dating Contract", function () {
       expect(profile.encryptedPhoneNumber).to.not.be.undefined;
     });
   });
+  // Additional comprehensive test cases to add to the existing FHEarts test suite
+
+  describe("Error Handling & Input Validation", function () {
+    it("Should revert when user tries to register twice", async function () {
+      // Try to register Alice again (she's already registered in before hook)
+      const duplicateInput = fhevm.createEncryptedInput(
+        fheFHEartsContractAddress,
+        signers.alice.address
+      );
+      duplicateInput.add8(1);
+      duplicateInput.add8(0);
+      duplicateInput.add64(1234567890);
+      duplicateInput.add8(25);
+      duplicateInput.add8(1);
+      duplicateInput.add8(1);
+      duplicateInput.add8(0);
+      duplicateInput.add8(1);
+      duplicateInput.add8(2);
+      duplicateInput.add8(3);
+
+      const duplicateEncrypted = await duplicateInput.encrypt();
+
+      await expect(
+        FHEartsContract.connect(signers.alice).registerUser(
+          duplicateEncrypted.handles[0],
+          duplicateEncrypted.handles[1],
+          duplicateEncrypted.handles[2],
+          duplicateEncrypted.handles[3],
+          duplicateEncrypted.handles[4],
+          duplicateEncrypted.handles[5],
+          duplicateEncrypted.handles[6],
+          duplicateEncrypted.handles[7],
+          duplicateEncrypted.handles[8],
+          duplicateEncrypted.handles[9],
+          duplicateEncrypted.inputProof
+        )
+      ).to.be.revertedWith("User already registered");
+    });
+
+    it("Should revert when unregistered user calls protected functions", async function () {
+      const [, , , , unregistered] = await ethers.getSigners();
+
+      await expect(
+        FHEartsContract.connect(unregistered).searchMatches()
+      ).to.be.revertedWith("User not registered");
+
+      await expect(
+        FHEartsContract.connect(unregistered).confirmMatch(1)
+      ).to.be.revertedWith("User not registered");
+
+      await expect(
+        FHEartsContract.connect(unregistered).clearMatch()
+      ).to.be.revertedWith("User not registered");
+
+      await expect(
+        FHEartsContract.connect(unregistered).deactivateProfile()
+      ).to.be.revertedWith("User not registered");
+    });
+
+    it("Should revert when searching with insufficient users", async function () {
+      // Deploy a fresh contract with only one user
+      const factory = (await ethers.getContractFactory(
+        "FHEarts"
+      )) as FHEarts__factory;
+      const freshContract = (await factory.deploy()) as FHEarts;
+      const freshAddress = await freshContract.getAddress();
+
+      // Register only one user
+      const soloInput = fhevm.createEncryptedInput(
+        freshAddress,
+        signers.alice.address
+      );
+      soloInput.add8(1);
+      soloInput.add8(0);
+      soloInput.add64(1111111111);
+      soloInput.add8(25);
+      soloInput.add8(1);
+      soloInput.add8(1);
+      soloInput.add8(0);
+      soloInput.add8(1);
+      soloInput.add8(2);
+      soloInput.add8(3);
+
+      const soloEncrypted = await soloInput.encrypt();
+      await freshContract
+        .connect(signers.alice)
+        .registerUser(
+          soloEncrypted.handles[0],
+          soloEncrypted.handles[1],
+          soloEncrypted.handles[2],
+          soloEncrypted.handles[3],
+          soloEncrypted.handles[4],
+          soloEncrypted.handles[5],
+          soloEncrypted.handles[6],
+          soloEncrypted.handles[7],
+          soloEncrypted.handles[8],
+          soloEncrypted.handles[9],
+          soloEncrypted.inputProof
+        );
+
+      await expect(
+        freshContract.connect(signers.alice).searchMatches()
+      ).to.be.revertedWith("Not enough users for matching");
+    });
+
+    it("Should revert when confirming invalid match index", async function () {
+      await expect(
+        FHEartsContract.connect(signers.alice).confirmMatch(999) // Invalid index
+      ).to.be.revertedWith("Invalid matched user");
+
+      await expect(
+        FHEartsContract.connect(signers.alice).confirmMatch(0) // Index 0 should be invalid
+      ).to.be.revertedWith("Invalid matched user");
+    });
+
+    it("Should revert when giving phone consent without mutual match", async function () {
+      // Create a new user who hasn't matched with Alice
+      const [, , , , newUser] = await ethers.getSigners();
+
+      const newInput = fhevm.createEncryptedInput(
+        fheFHEartsContractAddress,
+        newUser.address
+      );
+      newInput.add8(1);
+      newInput.add8(0);
+      newInput.add64(5555555555);
+      newInput.add8(30);
+      newInput.add8(1);
+      newInput.add8(0);
+      newInput.add8(1);
+      newInput.add8(1);
+      newInput.add8(2);
+      newInput.add8(3);
+
+      const newEncrypted = await newInput.encrypt();
+      await FHEartsContract.connect(newUser).registerUser(
+        newEncrypted.handles[0],
+        newEncrypted.handles[1],
+        newEncrypted.handles[2],
+        newEncrypted.handles[3],
+        newEncrypted.handles[4],
+        newEncrypted.handles[5],
+        newEncrypted.handles[6],
+        newEncrypted.handles[7],
+        newEncrypted.handles[8],
+        newEncrypted.handles[9],
+        newEncrypted.inputProof
+      );
+
+      await expect(
+        FHEartsContract.connect(signers.alice).givePhoneConsent(newUser.address)
+      ).to.be.revertedWith("No confirmed match with this user");
+    });
+  });
+
+  describe("State Management & Consistency", function () {
+    it("Should prevent responding to non-existent match requests", async function () {
+      await expect(
+        FHEartsContract.connect(signers.alice).respondToMatch(
+          signers.charlie.address,
+          true
+        )
+      ).to.be.revertedWith("No match request from this user");
+    });
+
+    it("Should handle clearing matches while having pending requests", async function () {
+      // Alice has pending requests, then clears her match
+      const pendingBefore = await FHEartsContract.hasPendingMatches(
+        signers.alice.address
+      );
+
+      await FHEartsContract.connect(signers.alice).clearMatch();
+
+      // Pending matches should still exist (clearing match doesn't affect incoming requests)
+      const pendingAfter = await FHEartsContract.hasPendingMatches(
+        signers.alice.address
+      );
+      expect(pendingAfter.length).to.equal(pendingBefore.length);
+    });
+
+    it("Should maintain index consistency after profile updates", async function () {
+      const initialCount = await FHEartsContract.activeUsersCount();
+      const aliceIndex = await FHEartsContract.userActiveIndex(
+        signers.alice.address
+      );
+
+      // Alice updates her profile
+      const updateInput = fhevm.createEncryptedInput(
+        fheFHEartsContractAddress,
+        signers.alice.address
+      );
+      updateInput.add8(1);
+      updateInput.add8(0);
+      updateInput.add64(9999999999);
+      updateInput.add8(26);
+      updateInput.add8(2);
+      updateInput.add8(1);
+      updateInput.add8(0);
+      updateInput.add8(4);
+      updateInput.add8(5);
+      updateInput.add8(6);
+
+      const updateEncrypted = await updateInput.encrypt();
+      await FHEartsContract.connect(signers.alice).updateProfile(
+        updateEncrypted.handles[0],
+        updateEncrypted.handles[1],
+        updateEncrypted.handles[2],
+        updateEncrypted.handles[3],
+        updateEncrypted.handles[4],
+        updateEncrypted.handles[5],
+        updateEncrypted.handles[6],
+        updateEncrypted.handles[7],
+        updateEncrypted.handles[8],
+        updateEncrypted.handles[9],
+        updateEncrypted.inputProof
+      );
+
+      // Index and count should remain the same
+      expect(await FHEartsContract.activeUsersCount()).to.equal(initialCount);
+      expect(
+        await FHEartsContract.userActiveIndex(signers.alice.address)
+      ).to.equal(aliceIndex);
+      expect(await FHEartsContract.IndexToAddress(aliceIndex)).to.equal(
+        signers.alice.address
+      );
+    });
+  });
+
+  describe("FHE Permissions & Security", function () {
+    it("Should fail decryption without proper permissions", async function () {
+      // Charlie tries to decrypt Alice's phone without consent
+      const aliceProfile = await FHEartsContract.profiles(
+        signers.alice.address
+      );
+
+      await expect(
+        fhevm.userDecryptEuint(
+          FhevmType.euint64,
+          aliceProfile.encryptedPhoneNumber,
+          fheFHEartsContractAddress,
+          signers.charlie
+        )
+      ).to.be.rejected; // Should fail due to lack of permissions
+    });
+  });
+
+  describe("Gas Optimization & Performance", function () {
+    it("Should measure gas costs for different operations", async function () {
+      // Measure gas for registration
+      const registrationTx = await FHEartsContract.connect(
+        signers.alice
+      ).clearMatch();
+      const registrationReceipt = await registrationTx.wait();
+      console.log(
+        `Clear match gas used: ${registrationReceipt?.gasUsed?.toString()}`
+      );
+
+      // Measure gas for search
+      const searchTx = await FHEartsContract.connect(
+        signers.alice
+      ).searchMatches();
+      const searchReceipt = await searchTx.wait();
+      console.log(
+        `Search matches gas used: ${searchReceipt?.gasUsed?.toString()}`
+      );
+
+      // Gas usage should be reasonable (under certain limits)
+      expect(Number(searchReceipt?.gasUsed || 0)).to.be.lessThan(5000000); // 5M gas limit
+    });
+
+    it("Should handle reasonable number of users efficiently", async function () {
+      // This test verifies the contract can handle multiple users without timing out
+      const userCount = await FHEartsContract.activeUsersCount();
+      expect(userCount).to.be.greaterThan(3);
+
+      // Search should complete in reasonable time even with multiple users
+      const startTime = Date.now();
+      await FHEartsContract.connect(signers.alice).searchMatches();
+      const endTime = Date.now();
+
+      console.log(
+        `Search with ${userCount} users took: ${endTime - startTime}ms`
+      );
+      // In test environment, should complete quickly
+      expect(endTime - startTime).to.be.lessThan(30000); // 30 seconds max
+    });
+  });
+
+  describe("Data Integrity & Consistency", function () {
+    it("Should maintain data consistency across multiple operations", async function () {
+      const initialUserCount = await FHEartsContract.activeUsersCount();
+
+      // Perform multiple operations
+      await FHEartsContract.connect(signers.alice).clearMatch();
+      await FHEartsContract.connect(signers.bob).clearMatch();
+      await FHEartsContract.connect(signers.charlie).clearMatch();
+
+      await FHEartsContract.connect(signers.alice).searchMatches();
+      await FHEartsContract.connect(signers.bob).searchMatches();
+
+      // User count should remain consistent
+      expect(await FHEartsContract.activeUsersCount()).to.equal(
+        initialUserCount
+      );
+
+      // All users should still be registered
+      expect(await FHEartsContract.isUserRegistered(signers.alice.address)).to
+        .be.true;
+      expect(await FHEartsContract.isUserRegistered(signers.bob.address)).to.be
+        .true;
+      expect(await FHEartsContract.isUserRegistered(signers.charlie.address)).to
+        .be.true;
+    });
+
+    it("Should handle rapid successive operations correctly", async function () {
+      // Rapid clear and search operations
+      await FHEartsContract.connect(signers.alice).clearMatch();
+      await FHEartsContract.connect(signers.alice).searchMatches();
+      await FHEartsContract.connect(signers.alice).clearMatch();
+      await FHEartsContract.connect(signers.alice).searchMatches();
+
+      // Should still have a valid match
+      const hasMatch = await FHEartsContract.hasMatch(signers.alice.address);
+      expect(hasMatch).to.be.true;
+
+      const [, , isValid] = await FHEartsContract.getBestMatch(
+        signers.alice.address
+      );
+      expect(isValid).to.be.true;
+    });
+  });
 });
