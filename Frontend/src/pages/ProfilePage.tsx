@@ -407,7 +407,7 @@ export function ProfilePage() {
   if (!hasDecrypted) {
     return (
       <>
-        <div className="w-full max-w-lg mx-auto mt-64 px-4">
+        <div className="w-full max-w-lg mx-auto mt-16 px-4">
           <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl p-6">
             <div className="text-center">
               <div className="w-20 h-20 bg-gradient-to-r from-pink-400 to-purple-500 rounded-full mx-auto mb-6 flex items-center justify-center">
@@ -450,7 +450,7 @@ export function ProfilePage() {
   // Decrypted profile display
   return (
     <>
-      <div className="w-full max-w-lg mx-auto mt-64 px-4">
+      <div className="w-full max-w-lg mx-auto mt-16 px-4">
         <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl p-5">
           <div className="text-center mb-6">
             <h1 className="text-2xl font-bold text-white mb-1">My Profile</h1>
