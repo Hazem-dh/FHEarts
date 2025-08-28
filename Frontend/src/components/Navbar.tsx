@@ -1,11 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { WalletButton } from "./walletButton";
 
-interface NavItem {
-  path: string;
-  label: string;
-  icon: string;
-}
+import { type NavItem } from "../types/types";
 
 export function Navbar() {
   const location = useLocation();

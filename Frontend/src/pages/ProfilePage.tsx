@@ -7,37 +7,7 @@ import { useInstance } from "../hooks/useInstance";
 import { toast, ToastContainer } from "react-toastify";
 import { ethers } from "ethers";
 import "react-toastify/dist/ReactToastify.css";
-
-interface ProfileData {
-  phoneNumber: string;
-  countryCode: number;
-  leadingZeros: number;
-  phoneDigits: number;
-  age: number;
-  location: number;
-  gender: number;
-  interestedIn: number;
-  preference1: number;
-  preference2: number;
-  preference3: number;
-  isActive: boolean;
-}
-
-// Type for the contract return value
-type ProfileContractResult = readonly [
-  string, // userAddress
-  bigint, // countryCode (euint8)
-  bigint, // leadingZero (euint8)
-  bigint, // encryptedPhoneNumber (euint64)
-  bigint, // age (euint8)
-  bigint, // location (euint8)
-  bigint, // gender (euint8)
-  bigint, // interestedIn (euint8)
-  bigint, // preference1 (euint8)
-  bigint, // preference2 (euint8)
-  bigint, // preference3 (euint8)
-  boolean // isActive
-];
+import { type ProfileData, type ProfileContractResult } from "../types/types";
 
 // Mapping data
 const LOCATION_OPTIONS = [
@@ -447,8 +417,8 @@ export function ProfilePage() {
                 Encrypted Profile
               </h2>
               <p className="text-white/70 mb-8 text-sm">
-                Your profile is encrypted on the blockchain. 
-                Decrypt it to view and edit your information.
+                Your profile is encrypted on the blockchain. Decrypt it to view
+                and edit your information.
               </p>
               <button
                 onClick={handleDecryptProfile}
@@ -483,7 +453,6 @@ export function ProfilePage() {
       <div className="w-full max-w-lg mx-auto mt-64 px-4">
         <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl p-5">
           <div className="text-center mb-6">
-
             <h1 className="text-2xl font-bold text-white mb-1">My Profile</h1>
             <p className="text-white/70 text-sm">
               {isEditing ? "Edit your information" : "Your decrypted profile"}
@@ -499,7 +468,9 @@ export function ProfilePage() {
               {isEditing ? (
                 <div className="flex items-center gap-2">
                   <div className="bg-white/10 border border-white/30 rounded-lg px-3 py-2 text-white text-sm">
-                    +{LOCATION_TO_COUNTRY_CODE[editedProfile?.location || 0] || 33}
+                    +
+                    {LOCATION_TO_COUNTRY_CODE[editedProfile?.location || 0] ||
+                      33}
                   </div>
                   <input
                     type="tel"

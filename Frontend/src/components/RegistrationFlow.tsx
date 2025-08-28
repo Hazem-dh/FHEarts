@@ -1,33 +1,9 @@
 import { useState } from "react";
-
-interface RegistrationData {
-  leadingZeros: number; // euint8 - Count of leading zeros
-  countryCode: number; // euint8 - Country code as number
-  phoneDigits: number; // euint64 - Phone digits without leading zeros
-  age: number;
-  location: number; // City/region code
-  gender: number; // 0 for male, 1 for female, 2 for non-binary, 3 for other
-  interestedIn: number; // 0 for male, 1 for female, 2 for non-binary, 3 for other
-  preference1: number; // Movie type (0-4)
-  preference2: number; // Activity (0-4)
-  preference3: number; // Personality type (0-2)
-}
-
-interface RegistrationStep {
-  id: keyof RegistrationData | "phoneNumber";
-  question: string;
-  type: "text" | "number" | "select" | "phone";
-  placeholder?: string;
-  options?:
-    | { label: string; value: number }[]
-    | { label: string; value: string }[];
-}
-
-interface RegistrationFlowProps {
-  onComplete: (data: RegistrationData) => void | Promise<void>;
-  onBack: () => void;
-  isSubmitting?: boolean; // Add this prop to track submission state from parent
-}
+import {
+  type RegistrationData,
+  type RegistrationStep,
+  type RegistrationFlowProps,
+} from "../types/types";
 
 const LOCATION_TO_COUNTRY_CODE = {
   0: 33, // France

@@ -8,19 +8,7 @@ import { useInstance } from "../hooks/useInstance";
 import { ethers } from "ethers";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-
-interface RegistrationData {
-  leadingZeros: number;
-  countryCode: number;
-  phoneDigits: number;
-  age: number;
-  location: number;
-  gender: number;
-  interestedIn: number;
-  preference1: number;
-  preference2: number;
-  preference3: number;
-}
+import { type RegistrationData } from "../types/types";
 
 export function HomePage() {
   const [isRegistered, setIsRegistered] = useState<boolean>(false);

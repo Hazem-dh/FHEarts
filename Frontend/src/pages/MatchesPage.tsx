@@ -8,23 +8,7 @@ import { ethers } from "ethers";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { type Address } from "viem";
-
-interface MatchData {
-  address: string;
-  hasMatch: boolean;
-  matchScore?: number;
-  matchIndex?: string;
-  isMutual: boolean;
-  hasPhoneConsent: boolean;
-  phoneNumber?: string;
-  countryCode?: number;
-  leadingZero?: number;
-}
-
-interface PendingMatch {
-  id: number;
-  address: string;
-}
+import { type MatchData, type PendingMatch } from "../types/types";
 
 export function MatchesPage() {
   const [isRegistered, setIsRegistered] = useState<boolean>(false);
