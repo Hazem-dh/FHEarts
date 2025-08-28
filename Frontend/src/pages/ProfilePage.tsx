@@ -198,8 +198,8 @@ export function ProfilePage() {
     );
     console.log("Decrypt result:", decryptResult);
     // Extract decrypted values
-    const countryCode = Number(decryptResult[result[1].toString()]);
-    const leadingZeros = Number(decryptResult[result[0].toString()]);
+    const countryCode = Number(decryptResult[result[0].toString()]);
+    const leadingZeros = Number(decryptResult[result[1].toString()]);
     const phoneDigits = Number(decryptResult[result[2].toString()]);
     const age = Number(decryptResult[result[3].toString()]);
     const location = Number(decryptResult[result[4].toString()]);
