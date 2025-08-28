@@ -12,6 +12,8 @@ import { type Address } from "viem";
 interface MatchData {
   address: string;
   hasMatch: boolean;
+  matchScore?: number;
+  matchIndex?: string;
   isMutual: boolean;
   hasPhoneConsent: boolean;
   phoneNumber?: string;
@@ -37,6 +39,7 @@ export function MatchesPage() {
   const [pendingMatches, setPendingMatches] = useState<PendingMatch[]>([]);
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const [isDecrypting, setIsDecrypting] = useState<boolean>(false);
+  const [isConfirming, setIsConfirming] = useState<boolean>(false);
 
   const navigate = useNavigate();
   const publicClient = usePublicClient();
@@ -101,10 +104,11 @@ export function MatchesPage() {
         return false;
       }
 
+      // Fixed: use correct function name from contract
       const result = await publicClient.readContract({
         address: contract_address as Address,
         abi: ABI,
-        functionName: "isRegistered",
+        functionName: "isUserRegistered", // Changed from "isRegistered"
         args: [address],
       });
       return Boolean(result);
@@ -137,18 +141,34 @@ export function MatchesPage() {
         };
       }
 
-      // Get best match details
+      // Get best match details - returns (euint8 score, euint64 matchIndex, bool isValid)
       const matchResult = (await publicClient.readContract({
         address: contract_address as Address,
         abi: ABI,
         functionName: "getBestMatch",
         args: [address],
-      })) as readonly [unknown, string, boolean];
+      })) as readonly [string, string, boolean]; // [encryptedScore, encryptedMatchIndex, isValid]
 
+      const encryptedScore = matchResult[0];
       const encryptedMatchIndex = matchResult[1];
+      const isValid = matchResult[2];
 
-      // Decrypt match index to get matched user address
-      const decryptedIndex = await decryptCiphertext(encryptedMatchIndex);
+      if (!isValid) {
+        return {
+          address: "",
+          hasMatch: false,
+          isMutual: false,
+          hasPhoneConsent: false,
+        };
+      }
+
+      // Decrypt match score and index
+      const [decryptedScore, decryptedIndex] = await Promise.all([
+        decryptCiphertext(encryptedScore),
+        decryptCiphertext(encryptedMatchIndex),
+      ]);
+
+      // Get matched user address from index
       const matchedUserAddress = (await publicClient.readContract({
         address: contract_address as Address,
         abi: ABI,
@@ -156,7 +176,27 @@ export function MatchesPage() {
         args: [decryptedIndex],
       })) as Address;
 
-      // Check if it's mutual
+      if (
+        !matchedUserAddress ||
+        matchedUserAddress === "0x0000000000000000000000000000000000000000"
+      ) {
+        return {
+          address: "",
+          hasMatch: false,
+          isMutual: false,
+          hasPhoneConsent: false,
+        };
+      }
+
+      // Check if current user has confirmed this match
+      const userConfirmed = await publicClient.readContract({
+        address: contract_address as Address,
+        abi: ABI,
+        functionName: "mutualMatches",
+        args: [address, matchedUserAddress],
+      });
+
+      // Check if matched user has also confirmed (making it mutual)
       const isMutual = await publicClient.readContract({
         address: contract_address as Address,
         abi: ABI,
@@ -166,7 +206,7 @@ export function MatchesPage() {
 
       // Check phone consent if mutual
       let hasPhoneConsent = false;
-      if (isMutual) {
+      if (userConfirmed && isMutual) {
         hasPhoneConsent = (await publicClient.readContract({
           address: contract_address as Address,
           abi: ABI,
@@ -178,7 +218,9 @@ export function MatchesPage() {
       return {
         address: matchedUserAddress,
         hasMatch: true,
-        isMutual: Boolean(isMutual),
+        matchScore: parseInt(decryptedScore),
+        matchIndex: decryptedIndex,
+        isMutual: Boolean(userConfirmed && isMutual),
         hasPhoneConsent: Boolean(hasPhoneConsent),
       };
     } catch (error) {
@@ -284,6 +326,95 @@ export function MatchesPage() {
       toast.error("Search failed");
     } finally {
       setIsSearching(false);
+    }
+  };
+
+  // New function to confirm a match (send match request)
+  const handleConfirmMatch = async (): Promise<void> => {
+    if (!writeContract || !matchData?.matchIndex) {
+      toast.error("Write contract or match index not available");
+      return;
+    }
+
+    setIsConfirming(true);
+    try {
+      const toastId = toast.loading("Sending match request...");
+
+      writeContract(
+        {
+          address: contract_address as Address,
+          abi: ABI,
+          functionName: "confirmMatch",
+          args: [matchData.matchIndex],
+        },
+        {
+          onSuccess: () => {
+            toast.update(toastId, {
+              render: "Match request sent!",
+              type: "success",
+              isLoading: false,
+              autoClose: 3000,
+            });
+            setTimeout(() => initializePage(), 2000);
+          },
+          onError: (error) => {
+            console.error("Confirm match error:", error);
+            toast.update(toastId, {
+              render: "Failed to send match request",
+              type: "error",
+              isLoading: false,
+              autoClose: 3000,
+            });
+          },
+        }
+      );
+    } catch (error) {
+      console.error("Error in handleConfirmMatch:", error);
+      toast.error("Failed to send match request");
+    } finally {
+      setIsConfirming(false);
+    }
+  };
+
+  const handleClearMatch = async (): Promise<void> => {
+    if (!writeContract) {
+      toast.error("Write contract not available");
+      return;
+    }
+
+    try {
+      const toastId = toast.loading("Clearing current match...");
+
+      writeContract(
+        {
+          address: contract_address as Address,
+          abi: ABI,
+          functionName: "clearMatch",
+        },
+        {
+          onSuccess: () => {
+            toast.update(toastId, {
+              render: "Match cleared!",
+              type: "success",
+              isLoading: false,
+              autoClose: 3000,
+            });
+            setTimeout(() => initializePage(), 2000);
+          },
+          onError: (error) => {
+            console.error("Clear match error:", error);
+            toast.update(toastId, {
+              render: "Failed to clear match",
+              type: "error",
+              isLoading: false,
+              autoClose: 3000,
+            });
+          },
+        }
+      );
+    } catch (error) {
+      console.error("Error in handleClearMatch:", error);
+      toast.error("Failed to clear match");
     }
   };
 
@@ -556,7 +687,7 @@ export function MatchesPage() {
                   </div>
                   <div className="flex-1">
                     <h3 className="text-lg font-semibold text-white mb-2">
-                      Your Match
+                      Your Match (Score: {matchData.matchScore}/99)
                     </h3>
                     <p className="text-white font-mono text-sm">
                       {matchData.address}
@@ -571,7 +702,7 @@ export function MatchesPage() {
                       >
                         {matchData.isMutual
                           ? "Mutual Match"
-                          : "Waiting for Response"}
+                          : "Not Confirmed Yet"}
                       </span>
                       {matchData.isMutual && (
                         <span
@@ -589,6 +720,18 @@ export function MatchesPage() {
                     </div>
                   </div>
                   <div className="flex flex-col gap-2">
+                    {/* Show confirm button if user hasn't confirmed match yet */}
+                    {!matchData.isMutual && (
+                      <button
+                        onClick={handleConfirmMatch}
+                        disabled={isConfirming}
+                        className="bg-pink-500 hover:bg-pink-600 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 disabled:opacity-50"
+                      >
+                        {isConfirming ? "Confirming..." : "Send Match Request"}
+                      </button>
+                    )}
+
+                    {/* Phone consent button for mutual matches */}
                     {matchData.isMutual && !matchData.hasPhoneConsent && (
                       <button
                         onClick={handleGivePhoneConsent}
@@ -597,6 +740,8 @@ export function MatchesPage() {
                         Give Phone Consent
                       </button>
                     )}
+
+                    {/* Decrypt phone button */}
                     {matchData.hasPhoneConsent && !matchData.phoneNumber && (
                       <button
                         onClick={handleDecryptPhone}
@@ -606,6 +751,14 @@ export function MatchesPage() {
                         {isDecrypting ? "Decrypting..." : "Get Phone Number"}
                       </button>
                     )}
+
+                    {/* Clear match button */}
+                    <button
+                      onClick={handleClearMatch}
+                      className="bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200"
+                    >
+                      Clear Match
+                    </button>
                   </div>
                 </div>
 
@@ -625,11 +778,24 @@ export function MatchesPage() {
             )}
           </div>
 
+          {/* Search Actions */}
+          <div className="p-6 border-b border-white/20">
+            <div className="flex gap-4 justify-center">
+              <button
+                onClick={handleSearchMatches}
+                disabled={isSearching || !instance}
+                className="bg-gradient-to-r from-purple-500 to-pink-600 text-white font-semibold py-3 px-6 rounded-lg hover:from-purple-600 hover:to-pink-700 transition-all duration-200 disabled:opacity-50"
+              >
+                {isSearching ? "Searching..." : "Search for New Matches"}
+              </button>
+            </div>
+          </div>
+
           {/* Pending Matches */}
           {pendingMatches.length > 0 && (
             <div className="p-6">
               <h2 className="text-xl font-semibold text-white mb-4">
-                Pending Match Requests
+                Pending Match Requests ({pendingMatches.length})
               </h2>
               <div className="grid gap-4">
                 {pendingMatches.map((match) => (
